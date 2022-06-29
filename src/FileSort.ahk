@@ -6,4 +6,4 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 ClassPath:=A_ScriptDir + "\Lib\Classes\"
 FunctionPath:=A_ScriptDir + "\Lib\*.ahk"
 #include *i %FunctionPath%
-#include *i %ClassPath%Strega.ahk
+#include %ClassPath%Strega.ahk
