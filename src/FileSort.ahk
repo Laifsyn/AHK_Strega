@@ -4,6 +4,6 @@ SendMode Input  ; Recommended for new scripts due to its superior speed and reli
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 #Requires AutoHotkey v2.0
 ClassPath:=A_ScriptDir + "\Lib\Classes\"
-FunctionPath:=A_ScriptDir + "\Lib\*.ahk"
-#include *i %FunctionPath%
+FunctionsPath:=A_ScriptDir + "\Lib\*.ahk"
+#include *i %FunctionsPath%
 #include %ClassPath%Strega.ahk
