@@ -130,32 +130,8 @@ class UpTime extends thisAHK {
     }
      
     }
+
     
-
-
-
-b:=A_msec
-
-
-thing_test() {
-    MsgBox % this.Hours " ABC"
-    }
-    
-thisAHK.test()
-thisAHK.startupTime := ""
-thisAHK.startupTime.Func1()
-
-    ;MsgBox % "asdasd " thisAHK.startupTime.Hours "hours"
-
-
-
-/*
-counter := new SecondCounter
-;counter.Start()
-Sleep 5000
-;counter.Stop()
-Sleep 2000
-*/
 ; An example class for counting the seconds...
 class SecondCounter {
     __New() {
