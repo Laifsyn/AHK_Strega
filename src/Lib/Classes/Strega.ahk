@@ -3,10 +3,13 @@
 now:= A_Now
 class NotepadPP {
     Path(){
-        return A_ProgramFiles "\Notepad++"
+        if FileExist(Dir:=A_ProgramFiles "\Notepad++")
+            return Dir
+        Else
+            return MsgBox("The File """ Dir """ Doesn't Exist", thisAHK.Title)
         }
     App(){
-            Clipboard:= this.Path() "\notepad++.exe"
+        ;    Clipboard:= this.Path() "\notepad++.exe"
         return this.Path() "\notepad++.exe"
         }
     }
@@ -33,13 +36,10 @@ Class VSCode {
         }
     }
 class thisAHK {
-;static StartupT := A_now  
+    static Title = "Strega AHK"
     __Init() {
-        if !(ThisAHK.StartupT = ""){
-            msgbox % "Tried to redefine vars"
+        if !(ThisAHK.StartupT = "")
             return
-        }
-
     ThisAHK.StartupT := A_Now
     ThisAHK.StartupMs := A_MSec
     ThisAHK.StartupTick := A_TickCount
@@ -49,52 +49,32 @@ class thisAHK {
                 return thisAHK.StartupT
         }
     }
+    Class startupTime {
+        ;Time(showMs as bool) Retrieves the complete time
+        Time(showMs := false) => (ShowMS = false ? FormatTime(this.StartupT, "yyyy M/d/yyyy HH:mm tt" : FormatTime(this.StartupT, "yyyy M/d/yyyy HH:mm:ss") "." StartupTime.Ms() " " ))
 
-    Time(showMs := false){
-        if ShowMS = false
-        return FormatTime(this.StartupT, "yyyy M/d/yyyy HH:mm tt")
-        else
-        return FormatTime(this.StartupT, "yyyy M/d/yyyy HH:mm:ss") "." StartupTime.Ms() " "
-    }
-    Era(Format:="yyyy"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Year(Format:="yyyy"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Month(Format:="MM"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Day(Format:="dd"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Hour(Format:="HH"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Minute(Format:="mm"){
-        return FormatTime(this.StartupT, Format)
-    }
-    Second(Format:="ss"){
-        return FormatTime(ThisAHK.StartupT, Format)
-    }
-    Ms(){
-         return this.StartupMs
-    }
-    Msec(){
-         return this.StartupMs
-    }
-    
-    ConfigPath(){
-    dir:=A_ScriptDir "\config"
-    if !FileExist(dir)
-        FileCreateDir, % dir
-    return dir
-    }
-    
-    Clear(){
-            
-        }
-    }
+        ;${Type of Date Number}(Format as String) 
+        Era(Format:="yyyy") => (FormatTime(this.StartupT, Format))
+        Year(Format:="yyyy") => (FormatTime(this.StartupT, Format))
+        Month(Format:="MM") => (FormatTime(this.StartupT, Format))
+        Day(Format:="dd") => (FormatTime(this.StartupT, Format))
+        Hour(Format:="HH") => (FormatTime(this.StartupT, Format))
+        Minute(Format:="mm") => (FormatTime(this.StartupT, Format))
+        Second(Format:="ss") => (FormatTime(ThisAHK.StartupT, Format))
+
+        ; Retrieves Startup ms
+        Ms() => (this.StartupMs)
+        Msec() => (this.StartupMs)
+        } ; end of startupTime class
+    Class Path(){
+        Configs(){   
+            dir:=A_ScriptDir "\configs"
+            if !FileExist(dir)
+                FileCreateDir, % dir
+            return dir
+            }
+        } ; end of Path class
+    } ; end of thisAHK class
     
 new thisAHK()
 
