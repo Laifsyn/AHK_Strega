@@ -14,4 +14,4 @@ The next step is to edit the file's metadata because all Chads loves to leave cr
 > Will check for specifics folders(In a list like array) and then perform some action.
 The script should additionally be able to judge the file's name and appropriately deal with it based on the file's name. It will move it at 'X' Location if it complies with 'Y' Conditions.
 
-This was inspired by my need to have to deal with universitie's files without the mind numbing of individually sorting and move the files. I would just rename it, and then let it be sorted instantly or however I wanted just by editing the file's name
+This was inspired by my need to have to deal with university's files without the mind numbing of individually sorting and move the files. I would just rename it, and then let it be sorted instantly or however I wanted just by editing the file's name
