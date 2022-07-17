@@ -1,6 +1,6 @@
 
 ; Create an object.
-now:= A_Now
+
 class NotepadPP {
     Path(){
         if FileExist(Dir:=A_ProgramFiles "\Notepad++")
@@ -78,7 +78,7 @@ class thisAHK {
     
 new thisAHK()
 
-Class ThisFile {
+Class ThisFile extends ThisAHK {
     static Dir:=A_Scriptdir
     static FullDir:= FullPath:=A_ScriptFullPath
     

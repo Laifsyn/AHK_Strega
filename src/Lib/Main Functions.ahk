@@ -1,34 +1,29 @@
-﻿#NoEnv  ; Recommended for performance and compatibility with future AutoHotkey releases.
-; #Warn  ; Enable warnings to assist with detecting common errors.
-SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
-SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
-
-
-FormatTime(Input := "", Format:=""){
-    if !(RegExMatch(Format, "(^[gyMdHhmst]+)"))
-       { MsgBox, Error in format: "%Format%"
-       Return ErrorData:="Error in Format input(" Format ")"
-       }
-    if (Input = ""){
-        return % this . "Error In FormatTime Input"
-    }   
+﻿
+; FormatTime(Input := "", Format:=""){
+;     if !(RegExMatch(Format, "(^[gyMdHhmst]+)"))
+;        { MsgBox "Error in format:" Format
+;        return ErrorData:="Error in Format input(" Format ")"
+;        }
+;     if (Input = ""){
+;         return  this . "Error In FormatTime Input"
+;     }   
     
-    FormatTime, Output , % Input, % Format
-    return Output
-}
+;     FormatTime, Output , % Input, % Format
+;     return Output
+; }
 
 
 
-FirstQuery(ByRef CounterOutput) {
+FirstQuery(&CounterOutput) {
     DllCall("QueryPerformanceCounter", "Int64*", CounterOutput)
     return CounterOutput
     }
 
-LastQuery(ByRef CounterOutput) {
+LastQuery(&CounterOutput) {
     DllCall("QueryPerformanceCounter", "Int64*", CounterOutput)
     return CounterOutput
     }
-GetFrequency(ByRef Frequency){
+GetFrequency(&Frequency){
     DllCall("QueryPerformanceFrequency", "Int64*", Frequency)
     return Frequency
     }
@@ -44,35 +39,30 @@ DoQuery(Time:=1000, skip:=false)     {
     DllCall("QueryPerformanceCounter", "Int64*", CounterAfter)
     Expression := (CounterAfter - CounterBefore) / freq * 1000 
     if ( skip = false )
-        MsgBox % "Elapsed QPC time is " . Expression " ms"
+        MsgBox "Elapsed QPC time is " . Expression " ms"
     return (CounterAfter - CounterBefore) / freq * 1000 
 }
 
 
 
-AddToTray1(){ ;Commons AddToTray Objects
+AddToTray(){ ;Commons AddToTray Objects
 ; Remove the standard menu items temporarily
-Menu, Tray, NoStandard 
-; Add our custom menu item labeled "Edit With Notepad++" 
+MyMenu := Menu()
+MyMenu.delete()
+; Add our custom MyMenu item labeled "Edit With Notepad++" 
 ; and calls the function above
 if FileExist(NotepadPP.App())
-    Menu, Tray, Add, Edit With Notepad++, thisFile.OpenWith.NotePP
+    MyMenu.Add("Edit With Notepad++", thisFile.OpenWith.NotePP)
 if FileExist(VSCode.App())
-    Menu, Tray, Add, Edit With VSCode, thisFile.OpenWith.VSCode
-Menu, Tray, Add, Open this File Dir, ThisFile.Open.Dir
-;Menu, Tray, Add, Open AHK Window 
+    MyMenu.Add("Edit With VSCode", thisFile.OpenWith.VSCode)
+MyMenu.Add("Open this File Dir", ThisFile.Open.Dir)
+;MyMenu, Tray, Add, Open AHK Window 
 ; Add a separator
-Menu, Tray, Add 
-; Put the standard menu items back, under our custom menu item
-Menu, Tray, Standard 
-return
+MyMenu.Add
+; Put the standard MyMenu items back, under our custom MyMenu item
+MyMenu.AddStandard
+return 
 }
-
-
-FuncMsgBox(Message:="Default Message", Timeout:="", Option:=0) {
-    MsgBox % Options, Strega AutoHotkey - File Organizer, % Message, % Timeout
-    return ErrorLevel
-    }
 
 ClearTooltip(Number, Period:="", Prio:= 0) {
     if !(Period = ""){
