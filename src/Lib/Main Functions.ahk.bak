@@ -1,4 +1,4 @@
-﻿#Warn Unreachable, Off  ; Enable warnings to assist with detecting common errors.
+﻿;#Warn Unreachable, Off  ; Enable warnings to assist with detecting common errors.
 ; FormatTime(Input := "", Format:=""){
 ;     if !(RegExMatch(Format, "(^[gyMdHhmst]+)"))
 ;        { MsgBox "Error in format:" Format

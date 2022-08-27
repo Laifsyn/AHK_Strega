@@ -1,6 +1,6 @@
 
 ; Create an object.
-#Warn Unreachable, Off  ; Enable warnings to assist with detecting common errors.
+;#Warn Unreachable, Off  ; Enable warnings to assist with detecting common errors.
 class NotepadPP {
     Path(){
         if FileExist(Dir:=A_ProgramFiles "\Notepad++")
