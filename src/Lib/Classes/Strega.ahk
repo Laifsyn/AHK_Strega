@@ -1,8 +1,13 @@
 
 ; Create an object.
-#Warn Unreachable, Off  ; Enable warnings to assist with detecting common errors.
+
 class NotepadPP {
+	static appPath := "Notepadd++"
     Path(){
+		IniRead(ThisFile.path.config, ThisFile.appSection, this.appPath, "")
+		ProcessPath := WinGetProcessPath("ahk_exe notepad++.exe")
+		A_clipboard:=RegExReplace(ProcessPath , "[^\\]+$" , "")
+		
         if FileExist(Dir:=A_ProgramFiles "\Notepad++")
             return Dir
         Else
@@ -66,8 +71,8 @@ class thisAHK {
         Ms() => (this.StartupMs)
         Msec() => (this.StartupMs)
         } ; end of startupTime class
-    Class Path(){
-        Configs(){   
+    Class paths(){
+        config(){   
             dir:=A_ScriptDir "\configs"
             if !FileExist(dir)
                 FileCreateDir, % dir
@@ -79,6 +84,7 @@ class thisAHK {
 new thisAHK()
 
 Class ThisFile extends ThisAHK {
+    static appSection:="Apps Section"
     static Dir:=A_Scriptdir
     static FullDir:= FullPath:=A_ScriptFullPath
     
