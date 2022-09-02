@@ -3,8 +3,11 @@
 
 class NotepadPP {
 	static appPath := "Notepadd++"
+	config :={
+		keyPath
+		}
     Path(){
-		IniRead(ThisFile.path.config, ThisFile.appSection, this.appPath, "")
+		IniRead(ThisFile.path.config, ThisFile.appSection, this.config.keyPath, "")
 		ProcessPath := WinGetProcessPath("ahk_exe notepad++.exe")
 		A_clipboard:=RegExReplace(ProcessPath , "[^\\]+$" , "")
 		
@@ -72,11 +75,12 @@ class thisAHK {
         Msec() => (this.StartupMs)
         } ; end of startupTime class
     Class paths(){
-        config(){   
-            dir:=A_ScriptDir "\configs"
-            if !FileExist(dir)
-                FileCreateDir, % dir
-            return dir
+        config{   
+			get {dir:=A_ScriptDir "\configs"
+				if !FileExist(dir)
+					DirCreate dir
+				return dir
+				}
             }
         } ; end of Path class
     } ; end of thisAHK class

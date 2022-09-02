@@ -10,9 +10,21 @@ msgbox "Message", "Title", MyTimeout
 ;msgbox("quote", "Title")
 ;Run "Notepad++.exe"
 ProcessPath := WinGetProcessPath("ahk_exe notepad++.exe")
-A_clipboard:=RegExReplace(ProcessPath , "[^\\]+$" , "")
-;C:\Program Files\Notepad++\
-msgbox(ProcessPath, "TITTLEEE")
+;A_clipboard:=RegExReplace(ProcessPath , "[^\\]+$" , "")
+
+    Class paths{
+        static mconfig {   
+				get {
+				dir:=A_ScriptDir "\configs"
+				if !FileExist(dir)
+					DirCreate dir
+				return "The File `"Dir`" Doesn't Exist"
+				}			
+            }
+        } ; end of Path class
+
+msgbox(paths.mconfig, "TITTLEEE")
+
 /*
 Run "C:\Scripts\AHK_Strega-main\DirTest.txt"
 Run "properties C:\Scripts\AHK_Strega-main\DirTest.txt"
