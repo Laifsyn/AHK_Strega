@@ -1,0 +1,32 @@
+{
+	"Calculo" : {
+					
+		"Key" : "Calculo",
+		"Target" : "C:\\Macro\\Basic 1\\Test\\",
+			"Action" : "Move" ,
+			"Type" : "Keyword" ,
+			"CaseSensitive" : "false"
+		},
+	"Fisica" : {
+		"Key" : "Fisica",
+		"Target" : "C:\\Macro\\Basic 1\\Test\\",
+			"Action" : "Move" ,
+			"Type" : "Keyword" ,
+			"CaseSensitive" : "false"
+		},
+	"Quimica" : {
+		"Key" : "Quimica",
+		"Target" : "C:\\Macro\\Basic 1\\Test\\",
+			"Action" : "Move" ,
+			"Type" : "Keyword" ,
+			"CaseSensitive" : "false"
+		},
+	"1" : {
+		"Key" : ["jpg","png"],
+		"Target" : "C:\\Macro\\Basic 1\\Images\\",
+			"Action" : "Move" ,
+			"Type" : "Filetype" ,
+			"CaseSensitive" : "false"
+		}
+	
+}
