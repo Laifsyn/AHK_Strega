@@ -1,0 +1,19 @@
+{
+	"Paths":{
+		"Watch_1" : {
+			"Source[asArray]" : ["Desktop", "Downloads"],
+			"isPath[Default:True]" : true,
+			"Keys" : ["Calculo","Fisica","Quimica"],
+			"Description" : "Path to Watch over"
+			},
+		"Watch_2" : {
+			"Source[asArray]" : ["Desktop", "Downloads"],
+			"isPath[Default:True]" : true,
+			"Keys" : ["1"],
+			"Description" : "Path to Watch over"
+			},
+		},
+	"Object1" : "LoadTes",
+	"Available Actions(Comment)" : ["Move"],
+	"Available Types(Comment)" : ["KeyWord","FileType"]
+}
