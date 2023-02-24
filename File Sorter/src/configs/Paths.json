@@ -1,35 +1,23 @@
 {
-	"Path1" : {
-		
-		"Source" : ["Search1", "Search2"],
-		"isPath[Default:True]" : true,
-		"Keys" : [{
-					
-					"Key" : "Calculo",
-					"Target" : "C:\\Macro\\Basic 1\\Test\\",
-						"Action" : "Move" ,
-						"Type" : "Keyword" ,
-						"CaseSensitive" : "false"
-					},
-					{
-					"Key" : "Fisica",
-					"Target" : "C:\\Macro\\Basic 1\\Test\\",
-						"Action" : "Move" ,
-						"Type" : "Keyword" ,
-						"CaseSensitive" : "false"
-					},
-					{
-					"Key" : "Quimica",
-					"Target" : "C:\\Macro\\Basic 1\\Test\\",
-						"Action" : "Move" ,
-						"Type" : "Keyword" ,
-						"CaseSensitive" : "false"
-					}
-			],
-		"Description" : "Path to Watch over"
+	"Paths":{
+		"Watch_1" : {
+			"Source[asArray]" : ["C:\\Users\\<UserName>\\Desktop\\", "Desktop"],
+			"isPath[Default:True]" : true,
+			"TargetKeys" : ["Calculo","Fisica","Quimica"],
+			"Description" : "Path to Watch over",
+			"TimeUp": "0M10d0h0m0s"
+			},
+		"Watch_2" : {
+			"Source[asArray]" : ["Desktop", "C:\\Users\\<UserName>\\Downloads\\"],
+			"isPath[Default:True]" : true,
+			"TargetKeys" : ["1"],
+			"Description" : "Path to Watch over",
+			"TimeUp": "15d8h"
+			}
 		},
 	"Object1" : "LoadTes",
 	"Available Actions(Comment)" : ["Move"],
-	"Available Types(Comment)" : ["KeyWord","FileType"]
-	
+	"Available Types(Comment)" : ["KeyWord","FileType"],
+	"Available Common Keywords(Comment)" : ["AppData", "Desktop", "MyDocuments", "<A_UserName>", "<UserName>"],
+	"LoadDefault" : 0
 }

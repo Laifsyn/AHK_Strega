@@ -1,32 +1,16 @@
 ﻿;msgbox, % OneDrive.CurrentSemesterPath " - Result"
 #include Libs\JSON.ahk
+#include Libs\Watchdog.ahk
 
-exit
 
 Startup()
-ReadResult:=FileRead(A_ScriptDir "\configs\Paths.json")
-
-exit
-MyObject:=JSON.Load(ReadResult)
+SetListVars(PathTargets[WatchPaths.Paths.Watch_1.TargetKeys[1]].Target)
+;SetListVars(WatchPaths.Paths.Watch_1.TargetKeys[1])
 
 
-For MainObject, Value in MyObject{
-	if !Value["isPath[Default:True]"]
-		Continue
-	For SourceIndex, SourceKeys in Value.Source{
-
-		For ThisIndex, TargetKeys in Value.Keys{
-			Text.=Format("Search in:""{}""`r`nThe Key""{}"", and {} to `r`n""{}""`r`n",SourceKeys, TargetKeys.Key, TargetKeys.Action, TargetKeys.Target)
-			
-			
-			}
-		Text.="`r`n"
-		}	
-	}
 
 
-msgbox, % Text
-CreateSemesterFolder()
+;CreateSemesterFolder()
 FuncWatchdog := Func("Watchdog").Bind(A_TickCount)
 SetTimer, % FuncWatchdog, -50
 exit
@@ -43,20 +27,12 @@ return
 #c:: run, % OneDrive.ScreenShotFolder
 exit
 Startup(){
-Global 
+Global PathTargets:=JSON.Load(FileRead(A_ScriptDir "\configs\Targets.json")), WatchPaths:=JSON.Load(FileRead(A_ScriptDir "\configs\Paths.json"))
 
 }
-Watchdog(InputTime:="") {
-	Static Index, watchDog_Data
-	watchDog_Data:=watchDog_Data=""?{}:watchDog_Data
-	watchDog_Data.StartTime:=InputTime=""?watchDog_Data.StartTime:new StartTime(InputTime)
-	tooltip, % Format("StartTime:{}, Index:{}",Watchdog_Data.StartTime.tick , Index), 0, 0, 1
-	Index+=1
-	
-	
-	SetTimer, Watchdog, -1000
-	}
+
 CreateSemesterFolder(){
+	
 	Loop, Files, % OneDrive.CurrentSemesterPath "\*" , D
 		RegisteredFolders .= A_LoopFileName ", "
 	MainSection:="Semester Folders"
@@ -128,6 +104,11 @@ Class OneDrive {
 
 
 ; Functions
+EnvSub(Time1, Time2, Type="days"){
+
+	EnvSub, Time1, % Time2 , % Type
+	return Time1
+	}
 FileRead(Filename){
 	FileRead, OutputVar, % Filename
 	Switch ErrorLevel{
@@ -142,6 +123,10 @@ FileRead(Filename){
 		exit
 		}
 	return OutputVar
+	}
+FormatTime(Format:="", Input :=""){
+	FormatTime, OutputVar , % Input , % Format
+	Return OutputVar
 	}
 IniRead(Filename, Section :="" ,Key :="" , Default:="" , Auto:=""){
 	IniRead, OutputVar, % Filename, % Section, % Key , % Default
@@ -174,4 +159,5 @@ SetListVars(Text){
 Class Laifsyn{
 	Static AHK_Title:= "File Sorter (Laifsyn)"
 	Static AHK_ScriptVersion:= "b0.1"
+	
 	}
