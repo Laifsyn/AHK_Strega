@@ -4,7 +4,6 @@
 
 
 Startup()
-SetListVars(PathTargets[WatchPaths.Paths.Watch_1.TargetKeys[1]].Target)
 ;SetListVars(WatchPaths.Paths.Watch_1.TargetKeys[1])
 
 
@@ -109,6 +108,11 @@ EnvSub(Time1, Time2, Type="days"){
 	EnvSub, Time1, % Time2 , % Type
 	return Time1
 	}
+	
+FileAppend(Text, Filename, Encoding:=""){
+	FileAppend, % Text, % Filename, % Encoding
+	}
+
 FileRead(Filename){
 	FileRead, OutputVar, % Filename
 	Switch ErrorLevel{
@@ -148,10 +152,12 @@ IniWrite(Input, Filename , Section :="" ,Key :="", AutoCreate:=False){
 MsgBox(Text, Title:="",Options:="", Timeout:=""){
 	MsgBox , % Options, % Title, % Text, % Timeout
 	}
-SetListVars(Text){
+SetListVars(Text, DoWaitMsg:=0){
 	ListVars
 	WinWaitActive ahk_class AutoHotkey
 	ControlSetText Edit1, % Text
+	if DoWaitMsg
+		Msgbox, Waiting.....
 	}
 	
 ; Common Classes

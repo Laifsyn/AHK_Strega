@@ -2,32 +2,53 @@
 	"test":{"Target":"C:\\Temp - AHK\\File Sorter"},
 	"Calculo" : {
 					
-		"Key" : "Calculo",
+		"Key" : ["Converted"],
+		"Target" : "C:\\Macro\\Basic 1\\Test",
+		"Action" : "Move" ,
+		"Type" : "Keyword" ,
+		"SortByDate" : 1 ,
+		"CaseSensitive" : "false"
+		},
+	"Calculo2" : {
+					
+		"Key" : ["Calculo"],
 		"Target" : "C:\\Macro\\Basic 1\\Test\\",
-			"Action" : "Move" ,
-			"Type" : "Keyword" ,
-			"CaseSensitive" : "false"
+		"Action" : "Move" ,
+		"Type" : "Keyword" ,
+		"SortByDate" : 0 ,
+		"CaseSensitive" : "false"
 		},
 	"Fisica" : {
-		"Key" : "Fisica",
+		"Key" : ["Fisica"],
 		"Target" : "C:\\Macro\\Basic 1\\Test\\",
-			"Action" : "Move" ,
-			"Type" : "Keyword" ,
-			"CaseSensitive" : "false"
+		"Action" : "Move" ,
+		"Type" : "Keyword" ,
+		"SortByDate" : 0 ,
+		"CaseSensitive" : "false"
 		},
 	"Quimica" : {
-		"Key" : "Quimica",
+		"Key" : ["Quimica"],
 		"Target" : "C:\\Macro\\Basic 1\\Test\\",
-			"Action" : "Move" ,
-			"Type" : "Keyword" ,
-			"CaseSensitive" : "false"
+		"Action" : "Move" ,
+		"Type" : "Keyword" ,
+		"SortByDate" : 0 ,
+		"CaseSensitive" : "false"
 		},
-	"1" : {
+	"Images" : {
 		"Key" : ["jpg","png"],
 		"Target" : "C:\\Macro\\Basic 1\\Images\\",
-			"Action" : "Move" ,
-			"Type" : "Filetype" ,
-			"CaseSensitive" : "false"
+		"Action" : "Move" ,
+		"Type" : "Filetype" ,
+		"SortByDate" : 0 ,
+		"CaseSensitive" : "false"
+		},
+	"2" : {
+		"Key" : ["jpg","png"],
+		"Target" : "C:\\Macro\\Basic 1\\Images\\",
+		"Action" : "Move" ,
+		"Type" : "Filetype" ,
+		"SortByDate" : 0 ,
+		"CaseSensitive" : "false"
 		}
 	
 }
