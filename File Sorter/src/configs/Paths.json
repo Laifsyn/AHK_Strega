@@ -6,7 +6,8 @@
 			"isPath[Default:True]" : true,
 			"TargetKeys" : ["Calculo","Fisica","Quimica", "2"],
 			"Description" : "Path to Watch over",
-			"TimeUp": "0M10d0h0m0s"
+			"TimeUp": "0M2d0h0m0s",
+			"AgeType(Age as Countdown)": 1
 			},
 		"Watch_2" : {
 			"Skip" : 1,
@@ -14,7 +15,8 @@
 			"isPath[Default:True]" : true,
 			"TargetKeys" : ["1"],
 			"Description" : "Path to Watch over",
-			"TimeUp": "15d8h"
+			"TimeUp": "15d8h",
+			"AgeType(Age as Countdown)": 1
 			},
 		"Watch_3" : {
 			"Skip" : 0,
@@ -22,7 +24,8 @@
 			"isPath[Default:True]" : true,
 			"TargetKeys" : ["Images"],
 			"Description" : "Path to Watch over",
-			"TimeUp": "15d8h"
+			"TimeUp": "15d8h",
+			"AgeType(Age as Countdown)": 1
 			}
 		},
 	"Object1" : "LoadTes",

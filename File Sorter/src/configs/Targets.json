@@ -1,5 +1,8 @@
 {
 	"test":{"Target":"C:\\Temp - AHK\\File Sorter"},
+	"DateKeys" : ["<Year>", "<Month>", "<Day>"],
+	"SpecialKeys" : [""],
+	"FileDateType" : "LastModified",
 	"Calculo" : {
 					
 		"Key" : ["Converted"],
@@ -44,7 +47,7 @@
 		},
 	"2" : {
 		"Key" : ["jpg","png"],
-		"Target" : "C:\\Macro\\Basic 1\\Images\\",
+		"Target" : "C:\\Temp - AHK\\Test\\Target\\<Year>\\<Month>\\<Day>",
 		"Action" : "Move" ,
 		"Type" : "Filetype" ,
 		"SortByDate" : 0 ,

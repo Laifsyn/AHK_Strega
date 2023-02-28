@@ -1,23 +1,38 @@
+/* Todo list
+-Finish S_getOrCreate_TimeMark()
+	Needs to store a file mark for the file in question
+-Create a LogFile for when a file is succesfully moved
+
+*/
+
 Watchdog(InputTime:="") {
+	
 	Global PathTargets, WatchPaths
 	Static Index, watchDog_Data
+	Start_Tick:= A_TickCount
 	watchDog_Data:=watchDog_Data=""?{}:watchDog_Data
 	watchDog_Data.StartTime:=InputTime=""?watchDog_Data.StartTime:new StartTime(InputTime)
 	;tooltip, % Format("StartTime:{}, Index:{}",Watchdog_Data.StartTime.tick , Index), 0, 0, 1
 	Index+=1
 	For Key, Paths in WatchPaths.Paths {
+		WP_Index+=1
 		If Paths.Skip
 			Continue
 		Text.=Format("PathName:[{}]`r`n", Key)
-		Paths:=S_RefinePaths(Key, Paths)
+		Paths:=S_RefineWatchPaths(Key, Paths)
+		
 		For Index, Name in Paths["Source[asArray]"]
 			{
 			Text.="[" Name "]`r`n"
 			Name:=S_ProcessWatchPaths(Name,WatchPaths["Available Common Keywords(Comment)"])	
+			If !FileExist(Name)
+				{	Warnings.= LogFormat(Format("Unknown Source Path! [{1}]",Name),"WARNING",Format("{1}:""{}"".{}",A_LineNumber,Key,A_Index))
+					Continue
+				}
 			Loop, Files, % Name ,F
 				{
 					
-					FileData:=S_RefineData(A_Now)
+					FileData:=S_RefineData(Paths["AgeType(Age as Countdown)"])
 					Text.= A_Tab Format(">[{4}][Last Edited:{3}{2}]({5}){1}",FileData.FullName,FileData.DetailedAge, A_Tab,Key, JSON.Dump(Paths.TargetKeys)) "`r`n" 
 					If True ;FileData.Age >= Paths.TimeUp
 						{
@@ -36,7 +51,7 @@ Watchdog(InputTime:="") {
 	If DebugText
 		SetListVars("Debugs Text`r`n" DebugText,1)
 	If (Warnings and A_Index <2)
-		SetListVars(Warnings, 1)
+		SetListVars( Format("{1}{3}`r`n`tThis Run Summary:`r`n{2}{4}ms to Process a first iteration",FormatTime("[yyyy/MM/dd HH:mm:ss.ms]"), Warnings, "" ,A_TickCount - Start_Tick), 1)
 	If Text
 		SetlistVars(Text,1)
 	pause
@@ -53,19 +68,43 @@ ListParse(InputObject := ""){ ; Parse a list of Strings in the next format "Stri
 			}
 	return Output
 	}
-S_RefineData(Time){
+S_getOrCreate_TimeMark(I_Object, FilePattern){
+	DisplayObject(I_Object,A_LineNumber)
+	IniRead(Filename, Section :="" ,Key :="" , Default:="" , Auto:="")
+	Time:=IniRead()
+	return
+	}
+S_RefineData(treatAsCountdown){
 	RegExMatch(A_LoopFileName, "O)(?P<Name>.*)\." A_LoopFileExt "?", SubPat)
+	
 	Map:={}
 	, Map.Extension:=A_LoopFileExt
 	, Map.Name:=SubPat.Name
 	, Map.FullName:= A_LoopFileName
-	, Map.Age:=EnvSub(A_Now,A_LoopFileTimeModified, "s")
-	, Map.DetailedAge:=FormatSeconds(Map.Age)
 	, Map.FullPath:= A_LoopFileLongPath
 	, Map.Path := A_LoopFileDir "\"
+	, Map.Time["LastModified"] := A_LoopFileTimeModified
+	, Map.Time["LastModified_Month"] := FormatTime("MM",A_LoopFileTimeModified)
+	, Map.Time["LastModified_Year"] := FormatTime("yyyy",A_LoopFileTimeModified)
+	, Map.Time["LastModified_Day"] := FormatTime("dd",A_LoopFileTimeModified)
+	, Map.Time["TimeCreated"] := A_LoopFileTimeCreated
+	, Map.Time["TimeCreated_Month"] := FormatTime("MM",A_LoopFileTimeCreated)
+	, Map.Time["TimeCreated_Year"] := FormatTime("yyyy",A_LoopFileTimeCreated)
+	, Map.Time["TimeCreated_Day"] := FormatTime("dd",A_LoopFileTimeCreated)
+	
+
+	
+		File_Birth:=treatAsCountdown?S_getOrCreate_TimeMark(Map,Format("{}\FileData.ini",A_ScriptDir)):A_LoopFileTimeModified
+			; Defines the Age(in seconds) of the file. In these 2 cases, we will either
+			; obtain the age in terms of since the file was modified, vs the age in terms of
+			; when it was first "found" by the script
+	
+	Map.Age:=EnvSub(A_Now,File_Birth, "s")
+	, Map.DetailedAge:=FormatSeconds(Map.Age)
+	DisplayObject(Map)
 	return Map
 	}	
-S_RefinePaths(Key, Paths){
+S_RefineWatchPaths(Key, Paths){
 	Global WatchPaths
 	
 	if ( !Paths.processedTimeup ){
@@ -79,16 +118,37 @@ S_RefinePaths(Key, Paths){
 		Paths.SourceName:= Key
 		Return Paths
 		}
+S_RefineTargetPath(ByRef InputString, I_Object, TargetObject:=""){
+	Global PathTargets
+	Target_DateKeys := ListParse(PathTargets.DateKeys)
+	Target_DateKeys := RegExReplace(Target_DateKeys, "<|>", "") ; Target_DateKeys := "<Year>|<Month>|<Day>"
+	DateType:=PathTargets.FileDateType
+	OdInput:=InputString
+	While ( InputString ~=  "i)<(" Target_DateKeys ")>" )
+		{	RegExMatch( InputString , "iO)(" Target_DateKeys ")" , SubPat)
+			InputString:=RegExReplace(InputString, "<" SubPat.Value(1) ">", I_Object.Time[Format("{}_{}", DateType, SubPat.Value(1) )] )
+		}
+	If !RegExMatch(InputString, "\\$")
+						InputString.="\"
+	
+	Return InputString
+	}
 S_ProcessFile_to_Target(Paths, FileData, Name){
 			Global PathTargets
-
 			
-			For Key, TargetKey in Paths.TargetKeys{
+			For Index, TargetKey in Paths.TargetKeys{
 					Target:=PathTargets[TargetKey]
 					If !Target
-						{Warning.=LogFormat(Format("There's no ""{1}"" key for Watcher:""{2}"" ",TargetKey, Name),"WARNING", A_LineNumber)
+						{Warning.=LogFormat(Format("There's no such Key: ""{1}""",TargetKey),"WARNING", Format("{1}:""{}"" {}",A_LineNumber,Name,A_IndexZ))
 						Continue
 						}
+					If ( (FileExist(DestPattern:=S_RefineTargetPath(Target["Target"],FileData, Target)) <> "D") and !( Target["Target"]~="i)" ListParse(PathTargets.DateKeys) ))
+						{	
+							Warning.= LogFormat(Format("Unknown Target Path! [{}]",DestPattern), "WARNING", Format("{1}:{}[""{}""]",A_LineNumber,Name,TargetKey))
+							Continue
+						}
+					
+					If Target
 					Switch Target["Type"]{
 						case "Keyword":
 							RegExList:= "i)(" ListParse(Target["Key"]) ")"
@@ -102,19 +162,37 @@ S_ProcessFile_to_Target(Paths, FileData, Name){
 								Continue
 							Text.= A_Tab Format("FileType({}):", FileData.Extension) FileData.FullName "`r`n"
 						Default:
-						Warning.=LogFormat("UNKNOWN KEY:""" Target["Type"] """ from " Paths.SourceName " in """ TargetKey """" ,"WARNING",A_LineNumber)
+						Warning.=LogFormat("UNKNOWN KEY!: """ Target["Type"] """ from " Paths.SourceName " in """ TargetKey """" ,"WARNING", Format("{1}:""{}"" {}",A_LineNumber,Name,A_Index) )
 						Continue
 						}
-					DisplayObject(Target)
-					;msgbox, % FormatTime("yyyy\MM\dd\",A_LoopFileTimeModified) ":" FileData.FullName "`r`n" FileData.FullPath
-					If Target["SortByDate"]
-						DatePath:=FormatTime("yyyy\MM\dd\",A_LoopFileTimeModified)
+
+					;DestPattern:=S_RefineTargetPath(Target["Target"],FileData, Target)
+					;DestPattern:= "C:\Temp - AHK\Test\Targets\"
+					
+					If !FileExist(DestPattern)
+							FileCreateDir( RegExReplace( DestPattern, "\*$",""))
 					FileSource:=FileData.FullPath
-					If !RegExMatch(Target["Target"], "\\$")
-						Target["Target"].="\"
-					TargetPath:= Target["Target"] DatePath FileData.FullName
-					SetlistVars(FileSource "`r`n" TargetPath,1)
-					DisplayObject(Paths, A_LineNumber "`r`n" FileData.FullPath "`r`n" Target["Target"])	
+					FileSource:="C:\Temp - AHK\Test\New Microsoft Word Document.docx"
+					;DestPattern:= DestPattern 
+					;SetlistVars(FileSource "`r`n" DestPattern)
+					WhileIndex:=1
+					While WhileIndex<= 256
+					{
+						
+						If ErrorCount >1
+							Subfix:=Format("* {1} ({2}).*",FormatTime("[yyyy.MM.dd HH.mm.ss]",FileData.Time[PathTargets.FileDateType]),ErrorCount-1)
+						else if ErrorCount
+							Subfix:=Format("* {1}.*",FormatTime("[yyyy.MM.dd HH.mm.ss]",FileData.Time[PathTargets.FileDateType]))
+						;if Subfix
+							;Msgbox, % Subfix
+						if FileMove(FileSource,DestPattern Subfix)
+							ErrorCount+=1
+						else
+							break
+						WhileIndex+=1
+					}
+					
+					msgbox, Continue?
 				}
 			
 			OutputText:={}

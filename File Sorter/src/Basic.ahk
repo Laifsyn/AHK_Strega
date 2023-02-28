@@ -112,7 +112,14 @@ EnvSub(Time1, Time2, Type="days"){
 FileAppend(Text, Filename, Encoding:=""){
 	FileAppend, % Text, % Filename, % Encoding
 	}
-
+FileCreateDir(DirName)	{
+	FileCreateDir, % DirName
+		Return ErrorLevel
+	}
+FileMove(SourcePattern, DestPattern, OverWrite:=0, AutoCreatePath:=0) {
+	FileMove, % SourcePattern, % DestPattern , % OverWrite	
+	Return ErrorLevel
+	}
 FileRead(Filename){
 	FileRead, OutputVar, % Filename
 	Switch ErrorLevel{
