@@ -2,7 +2,9 @@
 	"Paths":{
 		"Watch_1" : {
 			"Skip" : 0,
-			"Source[asArray]" : ["C:\\Users\\<UserName>\\Desktop\\", "C:\\Users\\<UserName>\\Downloads\\"],
+			"Source[asArray]" : ["C:\\Users\\<A_UserName>\\Desktop\\", 
+				"C:\\Users\\<A_UserName>\\Downloads\\<A_MM>\\<A_DD>\\<A_MM>"
+			],
 			"isPath[Default:True]" : true,
 			"TargetKeys" : ["Calculo","Fisica","Quimica", "2"],
 			"Description" : "Path to Watch over",
@@ -29,8 +31,11 @@
 			}
 		},
 	"Object1" : "LoadTes",
-	"Available Actions(Comment)" : ["Move"],
+	"!Available Actions(Comment)" : ["Move"],
 	"Available Types(Comment)" : ["KeyWord","FileType"],
-	"Available Common Keywords(Comment)" : ["AppData", "Desktop", "MyDocuments", "<A_UserName>", "<UserName>"],
+	"Available Common Keywords(Comment)" : ["<A_DD>", "<A_MM>", "<A_YYYY>", "<A_UserName>", "<A_Desktop>" , 
+									"<A_MyDocuments>", "<A_AppData>" , "<A_ComputerName>" , "<A_DDD>", "<A_DDDD>", 
+									"<A_WDay>", "<A_MMMM>", "<A_Mon>", "<A_MMM>", "<A_YDay>", "<A_YWeek>"
+									],
 	"LoadDefault" : 0
 }

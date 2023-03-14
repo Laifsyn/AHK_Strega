@@ -6,7 +6,7 @@
 	"Calculo" : {
 					
 		"Key" : ["Converted"],
-		"Target" : "C:\\Macro\\Basic 1\\Test",
+		"Target" : "C:\\Macro\\Basic 1\\Test\\<A_Mon>",
 		"Action" : "Move" ,
 		"Type" : "Keyword" ,
 		"SortByDate" : 1 ,
