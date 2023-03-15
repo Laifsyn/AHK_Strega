@@ -2,8 +2,8 @@
 	"Paths":{
 		"Watch_1" : {
 			"Skip" : 0,
-			"Source[asArray]" : ["C:\\Users\\<A_UserName>\\Desktop\\", 
-				"C:\\Users\\<A_UserName>\\Downloads\\<A_MM>\\<A_DD>\\<A_MM>"
+			"Source[asArray]" : ["C:\\Users\\<A_UserName>\\Desktop", 
+				"C:\\Users\\<A_UserName>\\Downloads"
 			],
 			"isPath[Default:True]" : true,
 			"TargetKeys" : ["Calculo","Fisica","Quimica", "2"],

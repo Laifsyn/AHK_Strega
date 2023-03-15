@@ -12,7 +12,7 @@ Watchdog(InputTime:="") {
 	Start_Tick:= A_TickCount
 	;tooltip, % Format("StartTime:{}, Index:{}",Watchdog_Data.StartTime.tick , Index), 0, 0, 1
 	Index+=1
-	WP_Index:=0
+	, WP_Index:=0 , Warnings:="", DebugText:=""
 	
 	For Key, Paths in WatchPaths["Paths"] {
 		
@@ -24,11 +24,10 @@ Watchdog(InputTime:="") {
 		Text.=Format("PathName:[{}]`r`n", Key)
 		Paths:=S_RefineWatchPaths(Key, Paths)
 		
-		For Index, Name in Paths["Source[asArray]"]
+		For WatchSource_Index, Name in Paths["Source[asArray]"]
 			{
-			
+				WarningText:=UDF.Map()
 			Text.="[" Name "]`r`n"
-			Name:=S_ProcessWatchPaths(Name,WatchPaths["Available Common Keywords(Comment)"])	
 			If !FileExist(Name)
 				{	Warnings.= LogFormat(Format("Unknown Source Path! [{1}]",Name),"WARNING",Format("{1}:`"{}`".{}",A_LineNumber,Key,A_Index))
 					Format(".{}",_rn)
@@ -36,9 +35,8 @@ Watchdog(InputTime:="") {
 				}
 			Loop Files Name ,"F"
 				{	
-					
-					FileData:=S_LoopFileData(Paths["AgeType(Age as Countdown)"])
-					WarningText:=S_ProcessFile_to_Target(Paths, FileData, Key)
+					FileData:=S_LoopFileData(Paths) 
+					WarningText:=S_ProcessFile_to_Target(Paths,FileData, Key)
 					DebugText.= WarningText["Text"]
 				}
 			Warnings .= WarningText["Warning"]
@@ -53,6 +51,7 @@ Watchdog(InputTime:="") {
 		SetListVars( Format("{1}{3}`r`n`tThis Run Summary:`r`n{2}{4}ms to Process a first iteration",FormatTime(A_Now,"[yyyy/MM/dd HH:mm:ss.ms]"), Warnings, "" ,A_TickCount - Start_Tick), 1)
 	If Text
 		SetlistVars(Text,1)
+	SetlistVars(MyText _rn A_LineNumber,1)
 	pause
 	SetTimer Watchdog, -1000
 	}
@@ -67,19 +66,44 @@ ListParse(InputObject := ""){ ; Parse a list of Strings in the next format "Stri
 			}
 	return Output
 	}
-S_getOrCreate_TimeMark(I_Object, FilePattern){
+	S_getFileAge(I_Object, FilePattern){
 	;define Section, and Keys.
+	
+	; I_Object["File_Age"]:=I_Object["isAgeCountdown"]?S_getOrCreate_TimeMark(FileData,Format("{}\Files Data.ini",A_ScriptDir))
+	;DisplayMap(I_Object,A_LineNumber)
+	If !I_Object["isAgeCountdown"]
+		Age:=I_Object["Time"]["LastModified"]
+	else 
+		{
+			/*
+				Age:=UDF.IniRead(FilePattern, I_Object["SourceName"]
+				, RegExReplace(I_Object["FullPath"],"=","``|") ; KeyName
+				, "N/A", A_Now)
+			*/
+			; I noticed that this Method of reading and defining file age is possibly terrible. I'll try to remember finish this some other day
+			; Some Source to consider: https://gist.github.com/anonymous1184/737749e83ade98c84cf619aabf66b063
+			; https://www.reddit.com/r/AutoHotkey/comments/s1it4j/automagically_readwrite_configuration_files/
+			;Age:=UDF.IniRead(FilePattern, I_Object["SourceName"],I_Object["FullPath"] "=ASAS", "N/A")
+			Age:=0
+		}
+	
+	;	Msgbox !I_Object["isAgeCountdown"] _rn Age _rn A_LineNumber _rn "Finished ?"
+	;DisplayMap(I_Object,A_LineNumber)
+	
 
-	DisplayMap(I_Object,A_LineNumber)
+	I_Object["Age"]:=DateDiff(A_Now,Age, "s")
+			, I_Object["DetailedAge"]:=FormatSeconds(I_Object["Age"])
 	;UDF.IniRead(Filename, Section :="" ,Key :="" , Default:="" , Auto:="")
 	;Time:=UDF.IniRead(FilePattern, )
-	return
+	return I_Object
 	}
-S_LoopFileData(treatAsCountdown){
+S_LoopFileData(I_Object){
 	RegExMatch(A_LoopFileName, "(?P<Name>.*)\." A_LoopFileExt "?", &SubPat)
 	Local Map
 	Map:=NoCaseMap()
 	Map["Extension"]:=A_LoopFileExt
+	, Map["SourceName"]:=I_Object["SourceName"]
+	, Map["isAgeCountdown"]:=I_Object["AgeType(Age as Countdown)"]
 	, Map["Name"]:=SubPat[1]
 	, Map["FullName"]:= A_LoopFileName
 	, Map["FullPath"]:= A_LoopFileFullPath
@@ -93,17 +117,6 @@ S_LoopFileData(treatAsCountdown){
 	, Map["Time"]["TimeCreated_Month"] := FormatTime(A_LoopFileTimeCreated, "MM")
 	, Map["Time"]["TimeCreated_Year"] := FormatTime(A_LoopFileTimeCreated, "yyyy")
 	, Map["Time"]["TimeCreated_Day"] := FormatTime(A_LoopFileTimeCreated, "dd")
-	
-
-	
-		File_Birth:=!treatAsCountdown?S_getOrCreate_TimeMark(Map,Format("{}\Files Data.ini",A_ScriptDir)):A_LoopFileTimeModified
-			; Defines the Age(in seconds) of the file. In these 2 cases, we will either
-			; obtain the age in terms of since the file was modified, vs the age in terms of
-			; when it was first "found" by the script
-	
-	
-	Map["Age"]:=DateDiff(A_Now,File_Birth, "s")
-	, Map["DetailedAge"]:=FormatSeconds(Map["Age"])
 	return Map
 	}	
 S_RefineWatchPaths(Key, Paths){
@@ -115,7 +128,13 @@ S_RefineWatchPaths(Key, Paths){
 				{ 	;If !RegExMatch(Value, "(<|>)")
 					;	Continue
 					;; Just in case so I know to try this IF Condition to improve performance, even if minimally	
+					if !(Value ~= "\\\*?$" )
+						Value:=Value "\"
+					if (Value ~= "\\$" )
+						Value:=Value "*"
+					
 					Paths["Source[asArray]"][ArrIndex]:= S_ProcessPathKeywords(Value)
+					
 				}
 			
 			SubMap:=S_TimeTextFormat_to_Seconds(Paths["TimeUp"])
@@ -124,7 +143,6 @@ S_RefineWatchPaths(Key, Paths){
 			, Paths["processedTimeUp"]:= 1
 			, WatchPaths["Paths"][Key]:=Paths
 			}
-		
 		Paths["SourceName"]:= Key
 		
 		Return Paths
@@ -142,20 +160,23 @@ S_RefineTargetPath(InputString, I_Object, TargetObject:=""){
 			
 		}
 	InputString:=S_ProcessPathKeywords(InputString)
-	msgbox InputString
+
 	If !RegExMatch(InputString, "\\$")
 						InputString.="\"
 	
 	Return InputString
 	}
 
-S_ProcessFile_to_Target(Paths, FileData, Name){
+
+	/*
+
+					
+
+	*/
+S_ProcessFile_to_Target(Paths, FileData, Name:=""){
 			Global PathTargets
 			Local Text:=""
 			For Index, TargetKey in Paths["TargetKeys"]{
-
-				
-				;DisplayMap(FileData,A_LineNumber)
 					Target:=PathTargets[TargetKey]
 					If !Target
 						{Warning.=LogFormat(Format("There's no such Key: `"{1}`"",TargetKey),"WARNING", Format("{1}:`"{}`" {}",A_LineNumber,Name,A_Index))
@@ -172,22 +193,30 @@ S_ProcessFile_to_Target(Paths, FileData, Name){
 					Switch Target["Type"], 0 
 					{
 						case "Keyword":
-							RegExList:= "i)(" ListParse(Target["Key"]) ")"
-							If !( FileData.Name ~=  RegExList )
-								Continue
-							Text.= A_Tab "Keyword:" FileData.Name "`r`n"
-							
+							;RegExList:= "i)(" ListParse(Target["Key"]) ")"
+							;If !( FileData["Name"] ~=  RegExList )
+							;	Continue
+							MatchObject:=FileData["Name"]
 						case "FileType":
-							RegExList:= "i)(" ListParse(Target["Key"]) ")"
-							If !( FileData["Extension"] ~= RegExList )
-								Continue
-							Text.= A_Tab Format("FileType({}):", FileData["Extension"]) FileData["FullName"] "`r`n"
+							;RegExList:= "i)(" ListParse(Target["Key"]) ")"
+							;If !( FileData["Extension"] ~= RegExList )
+							;	Continue
+							MatchObject:=FileData["Extension"]
 						Default:
 						Warning.=LogFormat("UNKNOWN KEY!: `"" Target["Type"] "`" from " Paths["SourceName"] " in `"" TargetKey "`"" ,"WARNING", Format("{1}:`"{}`" {}",A_LineNumber,Name,A_Index) )
 						Continue
 						}
 
-					;DestPattern:=S_RefineTargetPath(Target["Target"],FileData, Target)
+					ParsingResult:=0	
+					For Index, Value in Target["Key"]
+						{	If (RegExMatch(Value, "i)R/(.*)/",&SubPat))
+								{	ParsingResult+=RegExMatch(FileData["FullName"], SubPat[1])?1:0
+									Continue
+									}
+								ParsingResult+=(MatchObject ~= "i)" Value)?1:0 ; Hopefully this method is faster compared to using If Condition
+					}
+					If !(ParsingResult)
+						continue
 					;DestPattern:= "C:\Temp - AHK\Test\Targets\"
 					
 					If !FileExist(DestPattern)
@@ -197,8 +226,15 @@ S_ProcessFile_to_Target(Paths, FileData, Name){
 
 					;DestPattern:= DestPattern 
 					;SetlistVars(FileSource "`r`n" DestPattern)
+					
+					FileData:=S_getFileAge(FileData,Format("{}\logs\Files Data.ini",A_ScriptDir))
+					;ToDelete: FileData["File_Age"]:=FileData["isAgeCountdown"]?S_getOrCreate_TimeMark(FileData,Format("{}\Files Data.ini",A_ScriptDir)):FileData["Time"]["LastModified"]
+					; Defines the Age(in seconds) of the file. In these 2 cases, we will either
+					; obtain the age in terms of since the file was modified, vs the age in terms of
+					; when it was first "found" by the script
+					DisplayMap(FileData,A_LineNumber)
+
 					WhileIndex:=0, ErrorCount :=0, Subfix :=""
-					msgbox  "asdds"
 					While WhileIndex<= 256
 					{
 						WhileIndex:=A_Index
@@ -207,18 +243,26 @@ S_ProcessFile_to_Target(Paths, FileData, Name){
 						else if ErrorCount
 							Subfix:=Format("* {1}.*",FormatTime("[yyyy.MM.dd HH.mm.ss]",FileData["Time"][PathTargets["FileDateType"]]))
 						try
-							{ Msgbox A_LineNumber ")`r`nAttempts:" ErrorCount _rn FileSource _rn DestPattern Subfix _rn 
+							{ 
 							;FileMove(FileSource,DestPattern Subfix)
+							;Global myText.=(
+							;	A_LineNumber ")`r`nAttempts:" ErrorCount _rn FileSource _rn DestPattern Subfix _rn _rn )
+							Global myText.=Format("
+								( LTrim Join
+								{1} ") `r`n
+								{5} Attempts:" {2}`r`n 
+								{5} {3} ->`r`n
+								{5} {4}
+
+							)",A_LineNumber, ErrorCount,FileSource, DestPattern Subfix, A_Tab) _rn
 								Break
 							}
 						catch as E
-							{	
-								ErrorCount+=1
-							}
+							ErrorCount+=1
 						
 					}
 					
-					msgbox "Continue? " _rn A_LineNumber
+;					msgbox "Continue? " _rn A_LineNumber
 				}
 			
 			OutputText:=UDF.Map()
@@ -242,18 +286,7 @@ S_ProcessPathKeywords(Value, SupportedKeyWords:= "A_(Username|Y(YYY|Day|Week)|M{
 			}
 		Return Value
 	}
-S_ProcessWatchPaths(Input, StringList){
-	Name:=Input
-	Name:=RegExReplace(Name, "<(A_|)UserName>" , A_UserName)
-	 
-	CommonKeywordsList:= "\A(" ListParse(StringList) ")$"
-	IF (Name ~= CommonKeywordsList )
-			Name:=A_%Name% "\"
-	if (Name ~= "\\$" )
-		Name:=Name "*"
-	
-	Return Name
-	}
+
 S_TimeTextFormat_to_Seconds(Time_asString){
 	vMap:=UDF.Map("TimeInfo",Map())
 	
@@ -296,7 +329,11 @@ LogFormat(String:="", Level:="LOG", SourceLine:=""){
 	If !(SourceLine = "")
 		SourceLine:= Format("({})",SourceLine)
 	Type := Level SourceLine
-	Return Format("{1}{2}:{4}{3}`r`n",FormatTime(A_Now,"[hh:mm:ss.ms]"),Type,String,"")
+	Return Format("{1}{2}:{4}{3}`r`n"
+					,FormatTime(A_Now
+					,"[hh:mm:ss.ms]")
+					,Type
+					,String,"")
 	}
 
 FormatSeconds(NumberOfSeconds)  ; Convert the specified number of seconds to hh:mm:ss format.

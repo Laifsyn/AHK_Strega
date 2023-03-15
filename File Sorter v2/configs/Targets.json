@@ -46,7 +46,7 @@
 		"CaseSensitive" : "false"
 		},
 	"2" : {
-		"Key" : ["jpg","png"],
+		"Key" : ["jpg", "png", "r/Pp3/", "lnk"],
 		"Target" : "C:\\Temp - AHK\\Test\\Target\\<Year>\\<Month>\\<Day>",
 		"Action" : "Move" ,
 		"Type" : "Filetype" ,

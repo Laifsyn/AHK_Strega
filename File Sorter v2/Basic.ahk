@@ -101,9 +101,9 @@ Class UDF {
 		StartUp:=A_Now
 	}
 	Static IniRead(Filename, Section :="" ,Key :="" , Default:="" , Auto:=""){
+			; Auto is for what value to Write&Return in case the IniRead Target doesn't exists
 		OutputVar:=IniRead( Filename, Section, Key , Default)
-		IniRead(Filename, Section, Key [, Default])
-		If ( !(Auto="") && OutputVar = Default)
+		If ( !(Auto="") and OutputVar = Default)
 			{
 			this.IniWrite(Auto, Filename,  Section,  Key, True)
 			return Auto
@@ -111,14 +111,11 @@ Class UDF {
 		return OutputVar
 		}
 	Static IniWrite(Input, Filename , Section :="" ,Key :="", AutoCreate:=False){
-		If (!(FileExist(Filename)) && AutoCreate)
-				{
-				DirCreate RegExReplace(Filename, "[^\\]+$", "")
-				}
-		IniWrite Input , Filename, Section, Key
-		return A_LastError
+		If (!(FileExist(Filename)) and AutoCreate)
+				DirCreate RegExReplace(Filename, "[^\\]+$", "") ; This is in case you have something like "C:\Path\Path2\SomeFile.ini" -> "C:\Path\Path2\"
+			IniWrite Input , Filename, Section, Key
+		return A_LastError ;I honestly don't know what this does. So I'm leaving this just in case. 
 		}
-
 }
 
 Class Laifsyn{
