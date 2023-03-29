@@ -33,21 +33,21 @@ Class WatchFile Extends Map {
 				Continue
 			Temp := WatchFile.WatchPath(A_Settings, this)
 				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-                , Temp.DeleteProp("Summary")
+				, Temp.DeleteProp("Summary")
 				, this.Paths[Watcher] := Temp
 		}
 	}
-    LogFormat(){
-        Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
-    }
-	Summary[Line, Function := "",type:="INFO"] {
+	LogFormat() {
+		Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
+	}
+	Summary[Line, Function := "", type := "INFO"] {
 		set {
 			Static Cycles := 0, Content := ""
-            Content.=Format("{}({})(Func.{})({}){}`r`n",this.LogFormat(),Line,Function,Cycles,value)
-            this._Summary:=value
-            if !Mod(Cycles,50)
-                return
-            ; msgbox Content
+			Content .= Format("{}({})(Func.{})({}){}`r`n", this.LogFormat(), Line, Function, Cycles, value)
+			this._Summary := value
+			if !Mod(Cycles, 50)
+				return
+			; msgbox Content
 		}
 		get {
 			Try
@@ -57,57 +57,64 @@ Class WatchFile Extends Map {
 		}
 	}
 
-    Static process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)"){
-        While (Input ~= "i)<.*>")
-        {
-            Try
-            { RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
-                Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
-            }
-            catch ; Once there's no more matches, the Try Block seems to Spook out and I can simply just remove the invalids "<Keyplace>" from the Source Paths
-            { Input := RegExReplace(Input, "i)(<|>)", "")
-                Break
-            }
-        }
-        Return Input
-    }
+	Static process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
+		While (Input ~= "i)<.*>")
+		{
+			Try
+			{ RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
+				Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
+			}
+			catch ; Once there's no more matches, the Try Block seems to Spook out and I can simply just remove the invalids "<Keyplace>" from the Source Paths
+			{ Input := RegExReplace(Input, "i)(<|>)", "")
+				Break
+			}
+		}
+		Return Input
+	}
 
 	Class WatchPath Extends Map { ; The Path's to watch parameters.
-        CaseSense:=0
+		CaseSense := 0
 
 		__New(InputSettings, Parent) {
 			This.DefineProp("__parent", this)
 			For Key, SettingValue in InputSettings {
 				this[Key] := SettingValue
 			}
-            Return this
+			Return this
 		}
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
 					case "Source[asArray]":
-                        
-						Value:=this.process_Path(Value)
-                        value:=this.__parent.process_Keywords(value)
+						Value := this.process_Path(Value)
+						value := this.__parent.process_Keywords(value)
 					case "TimeUp":
-						Value:=this.process_TimeString(Value)
+						Value := this.process_TimeString(Value)
 				}
-                Super[KeyName]:=Value
+				Super[KeyName] := Value
 			}
 		}
 
-        process_Path(Input){ ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
-            if !(Input ~= "\\\*?$")
-                Input := Input "\"
+		process_Path(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
+			if !(Input ~= "\\\*?$")
+				Input := Input "\"
 			if (Input ~= "\\$")
 				Input := Input "*"
-            return input
-        }
+			return input
+		}
 
-        process_TimeString(Inpuit) {
-            
-            return
-        }
+		process_TimeString(Input) {
+			this.Set("TimeInfo", Map())
+				, this["TimeInfo"].CaseSense := "Off"
+			this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
+				, this["TimeInfo"]["Days"] := RegExMatch(Input, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
+					, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
+						, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
+							, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
+								, this["TimeUp"] := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
+
+			return this["TimeUp"]
+		}
 	}
 
 }
