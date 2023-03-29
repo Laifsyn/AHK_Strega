@@ -1,12 +1,98 @@
 ﻿#Requires AutoHotkey v2.0
-
+#Include <toml\toml>
+#Include <JXON>
+#Include <UDF>
 ; Something:=Ini("UDF IniRead.ini")
+; text
+Test:=Toml().read("
+(
+    [company]
+    name = "Acme Corp"
+    address = { street = "123 Main St.", city = "Anytown", state = "CA", zip = "12345" }
+    phone = "+1 555-555-5555"
+    website = "https://acmecorp.com"
+    founded = 1995-09-01T00:00:00Z
+    
+    [company.ceo]
+    name = "Jane Doe"
+    age = 50
+    isMale = false
+    salary = 150000.0
+    startDate = 2010-01-01T08:00:00Z
+    performanceRatings = [4.5, 4.7, 4.8, 4.9, 5.0]
+    hobbies = ["hiking", "reading", "yoga"]
+    address = { street = "456 Park Ave.", city = "Bigcity", state = "NY", zip = "54321" }
+    
+    [company.departments]
+    [company.departments.hr]
+    name = "Human Resources"
+    [company.departments.hr.manager]
+    name = "John Smith"
+    age = 45
+    isMale = true
+    salary = 100000.0
+    startDate = 2015-01-01T08:00:00Z
+    performanceRatings = [4.0, 4.2, 4.3, 4.5, 4.6]
+    hobbies = ["swimming", "cooking", "guitar"]
+    
+    [[company.departments.hr.employees]]
+      name = "Mary Brown"
+      age = 30
+      isMale = false
+      salary = 50000.0
+      startDate = 2020-01-01T08:00:00Z
+      performanceRatings = [4.2, 4.3, 4.4, 4.5, 4.6]
+      hobbies = ["painting", "sailing"]
+      address = { street = "789 Elm St.", city = "Smalltown", state = "TX", zip = "67890" }
+    [[company.departments.hr.employees]]
+      name = "Mark Green"
+      age = 35
+      isMale = true
+      salary = 60000.0
+      startDate = 2018-01-01T08:00:00Z
+      performanceRatings = [4.3, 4.5, 4.7, 4.8, 4.9]
+      hobbies = ["photography", "golf"]
+      address = { street = "234 Oak St.", city = "Othercity", state = "IL", zip = "45678" }
+    
+    [company.departments.it]
+    name = "Information Technology"
+    [company.departments.it.manager]
+    name = "Sarah Lee"
+    age = 40
+    isMale = false
+    salary = 120000.0
+    startDate = 2013-01-01T08:00:00Z
+    performanceRatings = [4.7, 4.8, 4.9, 5.0]
+    hobbies = ["traveling", "baking", "piano"]
+    
+    [[company.departments.it.employees]]
+      name = "David Wong"
+      age = 28
+      isMale = true
+      salary = 80000.0
+      startDate = 2021-01-01T08:00:00Z
+      performanceRatings = [4.0, 4.2, 4.3]
+    
+)"
+)
 
-
+text:=""
+; s:=Test.values["a"]["c"]["e"]["g"]["i"]["j"]
+; for k,v in s
+;     text.=Format("[{}]:={}`r`n",k, IsObject(v)?"object":v)
+; msgbox Text
+; text:=""
+; for k,v in s.OwnProps()
+;     text.=Format("[{}]:={}`r`n",k, IsObject(v)?"object":v)
+; msgbox Text
+msgbox Test.Values["company"]["website"]
+DisplayMap(Test.values)
+SetListVars(Text)
 class Ini extends Map {
     CaseSense := "Off" ; Because since I'm using it to store Window's Folder paths etc, case sense isn't a necessity
     SpecialChar := "¤"
-    __FileEncoding := "UTF-16"
+        __FileEncoding := "UTF-16"
+
 
     __New(Path) {
         this.DefineProp("__path", { Value: Path }) ; __path where the file is stored
@@ -306,3 +392,7 @@ class Ini extends Map {
 
 
 }
+
+
+
+^r::Reload
