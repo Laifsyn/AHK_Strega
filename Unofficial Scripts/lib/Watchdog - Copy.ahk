@@ -26,17 +26,46 @@ Class WatchFile Extends Map {
 		else if Type is "File"
 			watchFileString := fileread(Path, encoding)
 		this := JXON.Load(watchFileString)
-		this.Paths := WatchFile.WatchPaths()
+			;this.DefineProp("Paths", { Value: Map() })
+			, this.Paths := Map()
 		For Watcher, A_Settings in this["Paths"] {
-			this["Paths"][Watcher] := WatchFile.WatchPath(A_Settings)
+			If !!A_Settings["Skip"]
+				Continue
+			Temp := WatchFile.WatchPath(A_Settings, this)
+				, this.Summary[A_LineNumber, A_ThisFunc] := Temp.Summary
+				, this.Paths[Watcher] := Temp.Value
 		}
 	}
 
+	Summary[Line, Function := ""] {
+		set {
+			Static Cycles := 0
+
+
+		}
+		get {
+			Try
+				return this._Summary
+			catch
+				return ""
+		}
+	}
 
 	Class WatchPath Extends Map { ; The Path's to watch parameters.
-		__New(InputSettings) {
+		__New(InputSettings, Parent) {
+			This.DefineProp("__parent", this)
 			For Key, SettingValue in InputSettings {
 				this[Key] := SettingValue
+			}
+		}
+		__Item[KeyName] {
+			set {
+				switch KeyName, 0 {
+					case "Source[asArray]":
+						this.ProcessPath(Value)
+					case "TimeUp":
+						this.ProcessTimeString(Value)
+				}
 			}
 		}
 	}
