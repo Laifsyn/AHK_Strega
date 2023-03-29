@@ -29,19 +29,25 @@ Class WatchFile Extends Map {
 			;this.DefineProp("Paths", { Value: Map() })
 			, this.Paths := Map()
 		For Watcher, A_Settings in this["Paths"] {
-			If !!A_Settings["Skip"]
+			If !!(A_Settings["Skip"])
 				Continue
 			Temp := WatchFile.WatchPath(A_Settings, this)
-				, this.Summary[A_LineNumber, A_ThisFunc] := Temp.Summary
-				, this.Paths[Watcher] := Temp.Value
+				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
+                , Temp.DeleteProp("Summary")
+				, this.Paths[Watcher] := Temp
 		}
 	}
-
-	Summary[Line, Function := ""] {
+    LogFormat(){
+        Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
+    }
+	Summary[Line, Function := "",type:="INFO"] {
 		set {
-			Static Cycles := 0
-
-
+			Static Cycles := 0, Content := ""
+            Content.=Format("{}({})(Func.{})({}){}`r`n",this.LogFormat(),Line,Function,Cycles,value)
+            this._Summary:=value
+            if !Mod(Cycles,50)
+                return
+            ; msgbox Content
 		}
 		get {
 			Try
@@ -51,24 +57,59 @@ Class WatchFile Extends Map {
 		}
 	}
 
+    Static process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)"){
+        While (Input ~= "i)<.*>")
+        {
+            Try
+            { RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
+                Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
+            }
+            catch ; Once there's no more matches, the Try Block seems to Spook out and I can simply just remove the invalids "<Keyplace>" from the Source Paths
+            { Input := RegExReplace(Input, "i)(<|>)", "")
+                Break
+            }
+        }
+        Return Input
+    }
+
 	Class WatchPath Extends Map { ; The Path's to watch parameters.
+        CaseSense:=0
+
 		__New(InputSettings, Parent) {
 			This.DefineProp("__parent", this)
 			For Key, SettingValue in InputSettings {
 				this[Key] := SettingValue
 			}
+            Return this
 		}
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
 					case "Source[asArray]":
-						this.ProcessPath(Value)
+                        
+						Value:=this.process_Path(Value)
+                        value:=this.__parent.process_Keywords(value)
 					case "TimeUp":
-						this.ProcessTimeString(Value)
+						Value:=this.process_TimeString(Value)
 				}
+                Super[KeyName]:=Value
 			}
 		}
+
+        process_Path(Input){ ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
+            if !(Input ~= "\\\*?$")
+                Input := Input "\"
+			if (Input ~= "\\$")
+				Input := Input "*"
+            return input
+        }
+
+        process_TimeString(Inpuit) {
+            
+            return
+        }
 	}
+
 }
 
 
