@@ -6,76 +6,66 @@
 ; text
 Test:=Toml().read("
 (
-    [company]
-    name = "Acme Corp"
-    address = { street = "123 Main St.", city = "Anytown", state = "CA", zip = "12345" }
-    phone = "+1 555-555-5555"
-    website = "https://acmecorp.com"
-    founded = 1995-09-01T00:00:00Z
+    Object1 = "LoadTes"
+    "!Available Actions(Comment)" = [ "Move" ]
+    "Available Types(Comment)" = [ "KeyWord", "FileType" ]
+    "Available Common Keywords(Comment)" = [
+      "<A_DD>",
+      "<A_MM>",
+      "<A_YYYY>",
+      "<A_UserName>",
+      "<A_Desktop>",
+      "<A_MyDocuments>",
+      "<A_AppData>",
+      "<A_ComputerName>",
+      "<A_DDD>",
+      "<A_DDDD>",
+      "<A_WDay>",
+      "<A_MMMM>",
+      "<A_Mon>",
+      "<A_MMM>",
+      "<A_YDay>",
+      "<A_YWeek>"
+    ]
+    LoadDefault = 0
     
-    [company.ceo]
-    name = "Jane Doe"
-    age = 50
-    isMale = false
-    salary = 150000.0
-    startDate = 2010-01-01T08:00:00Z
-    performanceRatings = [4.5, 4.7, 4.8, 4.9, 5.0]
-    hobbies = ["hiking", "reading", "yoga"]
-    address = { street = "456 Park Ave.", city = "Bigcity", state = "NY", zip = "54321" }
+    [Paths.Watch_1]
+    Skip = 0
+    "Source[asArray]" = [
+    ]
+    "isPath[Default:True]" = true
+    TargetKeys = [ "Calculo", "Fisica", "Quimica", "2" ]
+    Description = "Path to Watch over"
+    TimeUp = "0M2d0h0m0s"
+    "AgeType(Age as Countdown)" = 1
     
-    [company.departments]
-    [company.departments.hr]
-    name = "Human Resources"
-    [company.departments.hr.manager]
-    name = "John Smith"
-    age = 45
-    isMale = true
-    salary = 100000.0
-    startDate = 2015-01-01T08:00:00Z
-    performanceRatings = [4.0, 4.2, 4.3, 4.5, 4.6]
-    hobbies = ["swimming", "cooking", "guitar"]
+    [Paths.Watch_2]
+    Skip = 1
+    "Source[asArray]" = [  ]
+    "isPath[Default:True]" = true
+    TargetKeys = [ "1" ]
+    Description = "Path to Watch over"
+    TimeUp = "15d8h"
+    "AgeType(Age as Countdown)" = 1
     
-    [[company.departments.hr.employees]]
-      name = "Mary Brown"
-      age = 30
-      isMale = false
-      salary = 50000.0
-      startDate = 2020-01-01T08:00:00Z
-      performanceRatings = [4.2, 4.3, 4.4, 4.5, 4.6]
-      hobbies = ["painting", "sailing"]
-      address = { street = "789 Elm St.", city = "Smalltown", state = "TX", zip = "67890" }
-    [[company.departments.hr.employees]]
-      name = "Mark Green"
-      age = 35
-      isMale = true
-      salary = 60000.0
-      startDate = 2018-01-01T08:00:00Z
-      performanceRatings = [4.3, 4.5, 4.7, 4.8, 4.9]
-      hobbies = ["photography", "golf"]
-      address = { street = "234 Oak St.", city = "Othercity", state = "IL", zip = "45678" }
-    
-    [company.departments.it]
-    name = "Information Technology"
-    [company.departments.it.manager]
-    name = "Sarah Lee"
-    age = 40
-    isMale = false
-    salary = 120000.0
-    startDate = 2013-01-01T08:00:00Z
-    performanceRatings = [4.7, 4.8, 4.9, 5.0]
-    hobbies = ["traveling", "baking", "piano"]
-    
-    [[company.departments.it.employees]]
-      name = "David Wong"
-      age = 28
-      isMale = true
-      salary = 80000.0
-      startDate = 2021-01-01T08:00:00Z
-      performanceRatings = [4.0, 4.2, 4.3]
+    [Paths.Watch_3]
+    Skip = 0
+    "Source[asArray]" = [  ]
+    "isPath[Default:True]" = true
+    TargetKeys = [ "Images" ]
+    Description = "Path to Watch over"
+    TimeUp = "15d8h"
+    "AgeType(Age as Countdown)" = 1
     
 )"
-)
-
+).toMap()
+for k,v in Test["Paths"]
+    try
+        msgbox k " " 
+var:=FileRead("configs\Paths.json")
+var:=JXON.Load(var)
+msgbox "sad"
+; msgbox var
 text:=""
 ; s:=Test.values["a"]["c"]["e"]["g"]["i"]["j"]
 ; for k,v in s
@@ -85,8 +75,8 @@ text:=""
 ; for k,v in s.OwnProps()
 ;     text.=Format("[{}]:={}`r`n",k, IsObject(v)?"object":v)
 ; msgbox Text
-msgbox Test.Values["company"]["website"]
-DisplayMap(Test.values)
+; msgbox Test.Values["company"]["website"]
+DisplayMap(test,A_LineNumber,4)
 SetListVars(Text)
 class Ini extends Map {
     CaseSense := "Off" ; Because since I'm using it to store Window's Folder paths etc, case sense isn't a necessity

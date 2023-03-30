@@ -37,7 +37,7 @@
 ; https://github.com/cocobelgica/AutoHotkey-JSON
 
 	Class JXON {
-	Static Load(&src, args*) {
+	Static Load(src, args*) {
 		key := "", is_key := false
 		stack := [ tree := [] ]
 		next := '"{[01234567890-tfn'
