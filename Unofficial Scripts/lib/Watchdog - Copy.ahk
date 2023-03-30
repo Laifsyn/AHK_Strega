@@ -111,9 +111,9 @@ Class WatchFile Extends Map {
 					, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
 						, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
 							, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
-								, this["TimeUp"] := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
+								, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
 
-			return this["TimeUp"]
+			return Input
 		}
 	}
 
