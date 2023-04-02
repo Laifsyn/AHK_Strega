@@ -310,11 +310,7 @@ Class WatchPath{
 	
 	
 	}
-DisplayMap(InputObject, LineNumber:="",Padding:=4){
-	Static Iteration:=0
-	SetlistVars(StrReplace(JXON.Dump(InputObject,Padding), "`n", "`r`n"))
-	msgbox "Displaying Map :" (Iteration+=1 ) " `r`n" LineNumber
-	}	
+
 
 Log(String, Action:="",SourceLine:="", FilePath:=""){
 	If (FilePath="")

@@ -72,7 +72,7 @@
 			is_array := (obj is Array)
 			
 			if i := InStr("{[", ch) { ; start new object / map?
-				val := (i = 1) ? UDF.Map() : Array()	; ahk v2
+				val := (i = 1) ? Map() : Array()	; ahk v2
 				
 				is_array ? obj.Push(val) : obj[key] := val
 				stack.InsertAt(1,val)
