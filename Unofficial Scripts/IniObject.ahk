@@ -4,6 +4,12 @@
 #Include <UDF>
 ; Something:=Ini("UDF IniRead.ini")
 ; text
+something:=Array("asdasdas2", "123123124")
+
+res:=something is Array?something:Array(something, "asdas222")
+msgbox res[1] ", " res.Length "`r`n" res[2]
+
+
 Test:=Toml().read("
 (
     Object1 = "LoadTes"
@@ -31,31 +37,34 @@ Test:=Toml().read("
     
     [Paths.Watch_1]
     Skip = 0
-    "Source[asArray]" = [
+    Source = [
+      "C:\\Users\\<A_UserName>\\Desktop",
+      "C:\\Users\\<A_UserName>\\Downloads"
     ]
-    "isPath[Default:True]" = true
+    isPath = true
     TargetKeys = [ "Calculo", "Fisica", "Quimica", "2" ]
     Description = "Path to Watch over"
     TimeUp = "0M2d0h0m0s"
-    "AgeType(Age as Countdown)" = 1
+    Age_asCountdown = 1
     
     [Paths.Watch_2]
     Skip = 1
-    "Source[asArray]" = [  ]
-    "isPath[Default:True]" = true
+    Source = [ "Desktop", "C:\\Users\\<UserName>\\Downloads\\" ]
+    isPath = true
     TargetKeys = [ "1" ]
     Description = "Path to Watch over"
     TimeUp = "15d8h"
-    "AgeType(Age as Countdown)" = 1
+    Age_asCountdown = 1
     
     [Paths.Watch_3]
     Skip = 0
-    "Source[asArray]" = [  ]
-    "isPath[Default:True]" = true
+    Source = [ "C:\\Users\\<UserName>\\Downloads\\Other\\*" ]
+    isPath = true
     TargetKeys = [ "Images" ]
     Description = "Path to Watch over"
     TimeUp = "15d8h"
-    "AgeType(Age as Countdown)" = 1
+    Age_asCountdown = 1
+    
     
 )"
 ).toMap()

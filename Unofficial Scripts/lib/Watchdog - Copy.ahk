@@ -56,21 +56,20 @@ Class WatchFile Extends Map {
 				return ""
 		}
 	}
-
+	; 
 	Static process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
 		While (Input ~= "i)<.*>")
 		{
 			Try
 			{ RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
-				Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
+				, Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
 			}
-			catch ; Once there's no more matches, the Try Block seems to Spook out and I can simply just remove the invalids "<Keyplace>" from the Source Paths
-			{ Input := RegExReplace(Input, "i)(<|>)", "")
+			catch ; Once there's no more matches, it stops iterating
 				Break
-			}
 		}
 		Return Input
 	}
+	Static process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
 
 	Class WatchPath Extends Map { ; The Path's to watch parameters.
 		CaseSense := 0
@@ -85,9 +84,16 @@ Class WatchFile Extends Map {
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
-					case "Source[asArray]":
-						Value := this.process_Path(Value)
-						value := this.__parent.process_Keywords(value)
+					case "Source":
+						Val:=Array()
+						, Value:=Value is Array?Value:Array(Value)
+						For _,v in Value {
+							v := this.process_Path(v)
+							, v := this.__parent.process_Keywords(v)
+							, v := this.__parent.process_invalidKeywords(v)
+							, Val.Push(v)
+						}
+						Value:=Val
 					case "TimeUp":
 						Value := this.process_TimeString(Value)
 				}
@@ -218,7 +224,7 @@ S_LoopFileData(I_Object) {
 	Map := NoCaseMap()
 	Map["Extension"] := A_LoopFileExt
 		, Map["SourceName"] := I_Object["SourceName"]
-		, Map["isAgeCountdown"] := I_Object["AgeType(Age as Countdown)"]
+		, Map["isAgeCountdown"] := I_Object["Age_asCountdown"]
 		, Map["Name"] := SubPat[1]
 		, Map["FullName"] := A_LoopFileName
 		, Map["FullPath"] := A_LoopFileFullPath
