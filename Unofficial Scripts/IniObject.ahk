@@ -4,10 +4,48 @@
 #Include <UDF>
 ; Something:=Ini("UDF IniRead.ini")
 ; text
-something:=Array("asdasdas2", "123123124")
 
-res:=something is Array?something:Array(something, "asdas222")
-msgbox res[1] ", " res.Length "`r`n" res[2]
+x:=&y
+y:=5
+;msgbox %x%
+something:=Object()
+something.Targets:=&Target
+something.Maps:=Map("asd", &Target )
+; something:=&Target
+; something.Targets:=Target
+
+Target:=JXON.Load("
+(
+{
+    "Key" : [12323,2,3,4]
+}
+)")
+
+%something.Targets%["Key"][1]:=5433432
+; Target["Key"][1]:=300003
+; try 
+; msgbox %something.Targets%["Key"][1]
+; msgbox Target["Key"][1]
+msgbox DisplayMap(%something.Maps["asd"]%["Key"])
+; DisplayMap(something.Targets, A_LineNumber)
+
+
+; asome:=Array()
+; MyFunction(a, b) {
+;     CheckArg "a", a
+;     CheckArg "b", b
+;     ;...
+;     CheckArg(name, value) {
+;         if value < 0
+;             throw ValueError(name " is negative", "myfunction", value)
+;     }
+; }
+
+; try
+;     MyFunction(1, -1)  ; err.Line indicates this line.
+; catch ValueError as err
+;     MsgBox UDF.ErrorFormat(err)
+
 
 
 Test:=Toml().read("

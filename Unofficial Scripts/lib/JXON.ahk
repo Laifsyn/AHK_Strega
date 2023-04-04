@@ -37,6 +37,28 @@
 ; https://github.com/cocobelgica/AutoHotkey-JSON
 
 	Class JXON {
+		
+	__New(Path, type := "Text", encoding := "UTF-8") {
+		this.DefineProp("__path", { Value: StrLen(path) })
+		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+		if Path is file
+		{
+			JsonString := Path.read()
+			Try
+				Path.Close()
+			catch as E
+			{
+				msgbox(E.What)
+				return
+			}
+		}
+		else if Type is "File"
+			JsonString := fileread(Path, encoding)
+			, this.DefineProp("__path", { Value: Path })
+		this := JXON.Load(JsonString)
+		return	
+		
+	}
 	Static Load(src, args*) {
 		key := "", is_key := false
 		stack := [ tree := [] ]

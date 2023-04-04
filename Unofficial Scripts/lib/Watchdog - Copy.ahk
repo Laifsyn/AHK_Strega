@@ -10,8 +10,8 @@
 Class WatchFile Extends Map {
 	__encoding := "UTF-16"
 	__New(Path, type := "Text", encoding := "UTF-16") {
-		this.DefineProp("__path", { Value: Path })
-		this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+		this.DefineProp("__path", { Value: StrLen(path) })
+		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
 		if Path is file
 		{
 			watchFileString := Path.read()
@@ -25,13 +25,14 @@ Class WatchFile Extends Map {
 		}
 		else if Type is "File"
 			watchFileString := fileread(Path, encoding)
+			, this.DefineProp("__path", { Value: Path })
 		this := JXON.Load(watchFileString)
 			;this.DefineProp("Paths", { Value: Map() })
 			, this.Paths := Map()
 		For Watcher, A_Settings in this["Paths"] {
 			If !!(A_Settings["Skip"])
 				Continue
-			Temp := WatchFile.WatchPath(A_Settings, this)
+			Temp := WatchFile.WatchPath(A_Settings, Watcher, this)
 				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
 				, Temp.DeleteProp("Summary")
 				, this.Paths[Watcher] := Temp
@@ -74,13 +75,13 @@ Class WatchFile Extends Map {
 	Class WatchPath Extends Map { ; The Path's to watch parameters.
 		CaseSense := 0
 
-		__New(InputSettings, Parent) {
-			This.DefineProp("__parent", this)
-			For Key, SettingValue in InputSettings {
-				this[Key] := SettingValue
-			}
+		__New(InputSettings, Watcher, Parent) {
+			This.DefineProp("__parent", Parent)
+			 , This.DefineProp("__watcher", Watcher)
+			 , this[Key] := SettingValue 
 			Return this
 		}
+		
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
@@ -88,7 +89,17 @@ Class WatchFile Extends Map {
 						Val:=Array()
 						, Value:=Value is Array?Value:Array(Value)
 						For _,v in Value {
-							v := this.process_Path(v)
+							v := this.process_AddEnding(v) 
+							, v := this.__parent.process_Keywords(v)
+							, v := this.__parent.process_invalidKeywords(v)
+							, Val.Push(v)
+						}
+						Value:=Val
+					case "TargetKeys":
+						Val:=Array()
+						, Value:=Value is Array?Value:Array(Value)
+						For _,v in Value {
+							v := this.process_AddEnding(v)
 							, v := this.__parent.process_Keywords(v)
 							, v := this.__parent.process_invalidKeywords(v)
 							, Val.Push(v)
@@ -96,12 +107,18 @@ Class WatchFile Extends Map {
 						Value:=Val
 					case "TimeUp":
 						Value := this.process_TimeString(Value)
+					default:
+						If value is Object
+							{
+								err:= ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), this.)
+								, msgbox(UDF.ErrorFormat(Err))
+							}
 				}
 				Super[KeyName] := Value
 			}
 		}
 
-		process_Path(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
+		process_AddEnding(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
 			if !(Input ~= "\\\*?$")
 				Input := Input "\"
 			if (Input ~= "\\$")
@@ -110,14 +127,14 @@ Class WatchFile Extends Map {
 		}
 
 		process_TimeString(Input) {
-			this.Set("TimeInfo", Map())
+			this.Set("TimeInfo", Map()) ;Call for a Set() so it doesn't call the __Item[] property
 				, this["TimeInfo"].CaseSense := "Off"
-			this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
+				, this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
 				, this["TimeInfo"]["Days"] := RegExMatch(Input, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
-					, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
-						, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
-							, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
-								, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
+				, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
+				, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
+				, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
+				, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
 
 			return Input
 		}

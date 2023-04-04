@@ -18,6 +18,10 @@ DisplayMap(InputObject, LineNumber:="",Padding:=4){
     }	
 
 Class UDF {
+	Static ErrorFormat(errObject) =>
+		Format("{1}: {2}.`n`nFile:`t{3}`nLine:`t{4}`nWhat:`t{5}`nStack:`n{6}"
+        , type(errObject), errObject.Message, errObject.File, errObject.Line, errObject.What, errObject.Stack)
+	
 	Class Map Extends Map{
 		CaseSense:="Off"
 		StartUp:=A_Now
