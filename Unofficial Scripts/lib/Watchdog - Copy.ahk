@@ -6,10 +6,98 @@
 */
 #Requires AutoHotkey v2.0
 
+class Watchdog_Base extends Map {
+	_encoding := "UTF-16"
+	
+	LogFormat() {
+		Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
+	}
+	Summary[Line, Function := "", type := "INFO"] {
+		set {
+			Static Cycles := 0, Content := ""
+			Content .= Format("{1}({2})(Func.{3})({4}){5}`r`n", this.LogFormat(), Line, Function, Cycles, value)
+			this._Summary := value
+			if !Mod(Cycles, 50)
+				return
+			; msgbox Content
+		}
+		get {
+			Try
+				return this._Summary
+			catch
+				return ""
+		}
+	}
+	
+	process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
+		While (Input ~= "i)<.*>")
+		{
+			Try
+			{ RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
+				, Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
+			}
+			catch ; Once there's no more matches, it stops iterating
+				Break
+		}
+		Return Input
+	}
 
-Class WatchFile Extends Map {
-	__encoding := "UTF-16"
-	__New(Path, type := "Text", encoding := "UTF-16") {
+	process_AddEnding(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
+		if !(Input ~= "\\\*?$")
+			Input := Input "\"
+		if (Input ~= "\\$")
+			Input := Input "*"
+		return input
+	}
+
+	process_TimeString(Input) {
+		this.Set("TimeInfo", Map()) ;Call for a Set() so it doesn't call the __Item[] property
+			, this["TimeInfo"].CaseSense := "Off"
+			, this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
+			, this["TimeInfo"]["Days"] := RegExMatch(Input, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
+			, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
+			, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
+			, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
+			, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
+
+		return Input
+	}
+	process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
+}
+
+Class TargetFile extends Watchdog_Base {
+	__New(Path, type := "Text", encoding := this._encoding) {
+		this.DefineProp("__path", { Value: StrLen(path) })
+		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+		if Path is file
+		{
+			JsonString := Path.read()
+			Try
+				Path.Close()
+			catch as E
+			{
+				msgbox(E.What)
+				return
+			}
+		}
+		else if Type is "File"
+			JsonString := fileread(Path, encoding)
+			, this.DefineProp("__path", { Value: Path })
+		this := JXON.Load(JsonString)
+			, this.Paths := Map()
+		For Key, A_Settings in this["Paths"] {
+			If !!(A_Settings["Skip"])
+				Continue
+			Temp := WatchFile.WatchPath(A_Settings, Key, this)
+				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
+				, Temp.DeleteProp("Summary")
+				, this.Paths[Key] := Temp
+		}
+	}
+}
+
+Class WatchFile Extends Watchdog_Base {
+	__New(Path, type := "Text", encoding := this._encoding) {
 		this.DefineProp("__path", { Value: StrLen(path) })
 		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
 		if Path is file
@@ -27,7 +115,6 @@ Class WatchFile Extends Map {
 			watchFileString := fileread(Path, encoding)
 			, this.DefineProp("__path", { Value: Path })
 		this := JXON.Load(watchFileString)
-			;this.DefineProp("Paths", { Value: Map() })
 			, this.Paths := Map()
 		For Watcher, A_Settings in this["Paths"] {
 			If !!(A_Settings["Skip"])
@@ -38,50 +125,19 @@ Class WatchFile Extends Map {
 				, this.Paths[Watcher] := Temp
 		}
 	}
-	LogFormat() {
-		Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
-	}
-	Summary[Line, Function := "", type := "INFO"] {
-		set {
-			Static Cycles := 0, Content := ""
-			Content .= Format("{}({})(Func.{})({}){}`r`n", this.LogFormat(), Line, Function, Cycles, value)
-			this._Summary := value
-			if !Mod(Cycles, 50)
-				return
-			; msgbox Content
-		}
-		get {
-			Try
-				return this._Summary
-			catch
-				return ""
-		}
-	}
 	; 
-	Static process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
-		While (Input ~= "i)<.*>")
-		{
-			Try
-			{ RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
-				, Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
-			}
-			catch ; Once there's no more matches, it stops iterating
-				Break
-		}
-		Return Input
-	}
-	Static process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
 
-	Class WatchPath Extends Map { ; The Path's to watch parameters.
+	Class WatchPath Extends Watchdog_Base { ; Wrapper to process the watcher's parameters
 		CaseSense := 0
 
 		__New(InputSettings, Watcher, Parent) {
 			This.DefineProp("__parent", Parent)
 			 , This.DefineProp("__watcher", Watcher)
-			 , this[Key] := SettingValue 
+			 for Key, val in InputSettings 
+			 	this[Key] := val
+			 
 			Return this
 		}
-		
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
@@ -110,43 +166,23 @@ Class WatchFile Extends Map {
 					default:
 						If value is Object
 							{
-								err:= ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), this.)
-								, msgbox(UDF.ErrorFormat(Err))
+								err:= ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), Type(this))
+								, msgbox(UDF.ErrorFormat(err))
 							}
 				}
 				Super[KeyName] := Value
 			}
 		}
-
-		process_AddEnding(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
-			if !(Input ~= "\\\*?$")
-				Input := Input "\"
-			if (Input ~= "\\$")
-				Input := Input "*"
-			return input
-		}
-
-		process_TimeString(Input) {
-			this.Set("TimeInfo", Map()) ;Call for a Set() so it doesn't call the __Item[] property
-				, this["TimeInfo"].CaseSense := "Off"
-				, this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
-				, this["TimeInfo"]["Days"] := RegExMatch(Input, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
-				, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
-				, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
-				, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
-				, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
-
-			return Input
-		}
 	}
 
 }
 
-
+WatchPaths:=""
+PathTargets:=""
 Watchdog(InputTime := "") {
 
 	Global PathTargets, WatchPaths, _rn
-	Static Index := 0, watchDog_Data := UDF.Map(StartTime, InputTime)
+	Static Index := 0, watchDog_Data := UDF.Map("StartTime", InputTime)
 	Start_Tick := A_TickCount
 	;tooltip, % Format("StartTime:{}, Index:{}",Watchdog_Data.StartTime.tick , Index), 0, 0, 1
 	Index += 1
@@ -238,7 +274,7 @@ S_getFileAge(I_Object, FilePattern) {
 S_LoopFileData(I_Object) {
 	RegExMatch(A_LoopFileName, "(?P<Name>.*)\." A_LoopFileExt "?", &SubPat)
 	Local Map
-	Map := NoCaseMap()
+	Map := UDF.Map()
 	Map["Extension"] := A_LoopFileExt
 		, Map["SourceName"] := I_Object["SourceName"]
 		, Map["isAgeCountdown"] := I_Object["Age_asCountdown"]
@@ -447,11 +483,11 @@ Class WatchPath {
 
 
 }
-DisplayMap(InputObject, LineNumber := "", Padding := 4) {
-	Static Iteration := 0
-	SetlistVars(StrReplace(JXON.Dump(InputObject, Padding), "`n", "`r`n"))
-	msgbox "Displaying Map :" (Iteration += 1) " `r`n" LineNumber
-}
+; DisplayMap(InputObject, LineNumber := "", Padding := 4) {
+; 	Static Iteration := 0
+; 	SetlistVars(StrReplace(JXON.Dump(InputObject, Padding), "`n", "`r`n"))
+; 	msgbox "Displaying Map :" (Iteration += 1) " `r`n" LineNumber
+; }
 
 Log(String, Action := "", SourceLine := "", FilePath := "") {
 	If (FilePath = "")

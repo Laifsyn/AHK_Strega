@@ -2,6 +2,8 @@
 #Include <toml\toml>
 #Include <JXON>
 #Include <UDF>
+#Include <Watchdog - Copy>
+_rn:="`r`n"
 ; Something:=Ini("UDF IniRead.ini")
 ; text
 
@@ -10,23 +12,32 @@ y:=5
 ;msgbox %x%
 something:=Object()
 something.Targets:=&Target
-something.Maps:=Map("asd", &Target )
+something.Maps:=Map("asd", &Target)
+something.Target := &Target
 ; something:=&Target
 ; something.Targets:=Target
+
+exit
 
 Target:=JXON.Load("
 (
 {
-    "Key" : [12323,2,3,4]
+    "Key" : [12323,2,3,4],
+    "Key2" : [12323,2,3,4]
+    
 }
 )")
 
-%something.Targets%["Key"][1]:=5433432
+something.Key:= %something.Target%["Key"]
+something.Key2:= %something.Target%["Key2"]
+DisplayMap(%something.Target%)
+something.key2[1]:=5433432
 ; Target["Key"][1]:=300003
 ; try 
 ; msgbox %something.Targets%["Key"][1]
 ; msgbox Target["Key"][1]
-msgbox DisplayMap(%something.Maps["asd"]%["Key"])
+
+msgbox something.key2[1]
 ; DisplayMap(something.Targets, A_LineNumber)
 
 
