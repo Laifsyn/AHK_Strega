@@ -39,6 +39,7 @@ class Watchdog_Base extends Map {
 			catch ; Once there's no more matches, it stops iterating
 				Break
 		}
+		msgbox "PropList`r`n" UDF.getPropsList(this) "`r`n" Input
 		Return Input
 	}
 
@@ -63,59 +64,65 @@ class Watchdog_Base extends Map {
 		return Input
 	}
 	process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
+
+	transformString(Path,Type, encoding){ ; To transform a string path into a possibly JSON String
+		if Path is file
+			{
+				JsonString := Path.read()
+				Try
+					Path.Close()
+				catch as E
+				{
+					msgbox(E.What)
+					return
+				}
+			}
+			else if Type = "File"
+				JsonString := fileread(Path, encoding)
+				, this.DefineProp("__path", { Value: Path })
+			else if Type = "Text"
+				JsonString := Path
+			else
+				throw ValueError("No matching data? Expects a path or string, but registered " Type, Type(this))
+		return JXON.Load(JsonString)
+	}
+	mergeMap(InstRef,Map){
+		For k,v in Map
+			InstRef[k]:=v
+	}
+	
+	__Set(Name, Params, value){ ;Idk what Params do, so I'll leave it alone
+		super.%Name%:=value 
+			; So I don't need to specificaly call for Super when defining a property in the child classes. Hopefully I will find how to properly make it work with Params
+	}
 }
 
 Class TargetFile extends Watchdog_Base {
 	__New(Path, type := "Text", encoding := this._encoding) {
 		this.DefineProp("__path", { Value: StrLen(path) })
 		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-		if Path is file
-		{
-			JsonString := Path.read()
-			Try
-				Path.Close()
-			catch as E
-			{
-				msgbox(E.What)
-				return
-			}
-		}
-		else if Type is "File"
-			JsonString := fileread(Path, encoding)
-			, this.DefineProp("__path", { Value: Path })
-		this := JXON.Load(JsonString)
+		, JsonMap:=this.transformString(Path,Type, encoding)
+		, this.mergeMap(this,JsonMap)
 			, this.Paths := Map()
 		For Key, A_Settings in this["Paths"] {
 			If !!(A_Settings["Skip"])
 				Continue
-			Temp := WatchFile.WatchPath(A_Settings, Key, this)
-				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-				, Temp.DeleteProp("Summary")
-				, this.Paths[Key] := Temp
+			; Temp := WatchFile.WatchPath(A_Settings, Key, this)
+			; 	, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
+			; 	, Temp.DeleteProp("Summary")
+			; 	, this.Paths[Key] := Temp
 		}
 	}
 }
 
 Class WatchFile Extends Watchdog_Base {
-	__New(Path, type := "Text", encoding := this._encoding) {
+	__New(Path, Type := "Text", encoding := this._encoding) {
 		this.DefineProp("__path", { Value: StrLen(path) })
 		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-		if Path is file
-		{
-			watchFileString := Path.read()
-			Try
-				Path.Close()
-			catch as E
-			{
-				msgbox(E.What)
-				return
-			}
-		}
-		else if Type is "File"
-			watchFileString := fileread(Path, encoding)
-			, this.DefineProp("__path", { Value: Path })
-		this := JXON.Load(watchFileString)
-			, this.Paths := Map()
+		, JsonMap:=this.transformString(Path,Type, encoding)
+		, this.mergeMap(this,JsonMap)
+			, this.Paths := Map() ; so I can store the Watcher's data here
+		msgbox UDF.getPropsList(this)
 		For Watcher, A_Settings in this["Paths"] {
 			If !!(A_Settings["Skip"])
 				Continue
@@ -131,8 +138,9 @@ Class WatchFile Extends Watchdog_Base {
 		CaseSense := 0
 
 		__New(InputSettings, Watcher, Parent) {
-			This.DefineProp("__parent", Parent)
-			 , This.DefineProp("__watcher", Watcher)
+			msgbox Watcher " " A_LineNumber
+			This.DefineProp("__parent", { Value : Parent})
+			 , this.DefineProp("__watcher", { Value : Watcher})
 			 for Key, val in InputSettings 
 			 	this[Key] := val
 			 
@@ -146,19 +154,17 @@ Class WatchFile Extends Watchdog_Base {
 						, Value:=Value is Array?Value:Array(Value)
 						For _,v in Value {
 							v := this.process_AddEnding(v) 
-							, v := this.__parent.process_Keywords(v)
-							, v := this.__parent.process_invalidKeywords(v)
+							, v := this.process_Keywords(v)
+							, v := this.process_invalidKeywords(v)
 							, Val.Push(v)
+							msgbox v
 						}
 						Value:=Val
 					case "TargetKeys":
 						Val:=Array()
 						, Value:=Value is Array?Value:Array(Value)
 						For _,v in Value {
-							v := this.process_AddEnding(v)
-							, v := this.__parent.process_Keywords(v)
-							, v := this.__parent.process_invalidKeywords(v)
-							, Val.Push(v)
+							Val.Push(v)
 						}
 						Value:=Val
 					case "TimeUp":
@@ -475,14 +481,6 @@ S_TimeTextFormat_to_Seconds(Time_asString) {
 	return vMap
 }
 
-Class WatchPath {
-	__New(Paths, Targets) {
-
-
-	}
-
-
-}
 ; DisplayMap(InputObject, LineNumber := "", Padding := 4) {
 ; 	Static Iteration := 0
 ; 	SetlistVars(StrReplace(JXON.Dump(InputObject, Padding), "`n", "`r`n"))

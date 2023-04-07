@@ -3,6 +3,15 @@
 #Include <JXON>
 #Include <UDF>
 #Include <Watchdog - Copy>
+
+
+
+
+
+
+
+WatchPath:=WatchFile(A_WorkingDir "\configs\Paths.json","File")
+DisplayMap(WatchPath.Paths, A_LineNumber)
 _rn:="`r`n"
 ; Something:=Ini("UDF IniRead.ini")
 ; text
