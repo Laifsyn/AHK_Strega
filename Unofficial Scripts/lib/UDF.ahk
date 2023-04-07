@@ -25,7 +25,7 @@ Class UDF {
 	Static getPropsList(inputObject){
 		Text:=""
 		for prop,_ in inputObject.OwnProps()
-			Text.= prop (IsObject(_)?"":" : " SubStr(_,1,50)) "`r`n" 
+			Text.= prop (IsObject(_)?Format(" : [{1:#x}] {2}",ObjPtr(_), Type(_)):" : " SubStr(_,1,50)) "`r`n" 
 		return Text
 	}
 

@@ -10,8 +10,10 @@
 
 
 
-WatchPath:=WatchFile(A_WorkingDir "\configs\Paths.json","File")
-DisplayMap(WatchPath.Paths, A_LineNumber)
+; WatchPath:=WatchFile(A_WorkingDir "\configs\Paths.json","File")
+; DisplayMap(WatchPath, A_LineNumber)
+TargetPath:=TargetFile(A_WorkingDir "\configs\Targets.json","File")
+DisplayMap(TargetPath, A_LineNumber)
 _rn:="`r`n"
 ; Something:=Ini("UDF IniRead.ini")
 ; text

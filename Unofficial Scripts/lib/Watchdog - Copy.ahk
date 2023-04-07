@@ -8,7 +8,7 @@
 
 class Watchdog_Base extends Map {
 	_encoding := "UTF-16"
-	
+	CaseSense := "Off"
 	LogFormat() {
 		Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
 	}
@@ -28,7 +28,6 @@ class Watchdog_Base extends Map {
 				return ""
 		}
 	}
-	
 	process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
 		While (Input ~= "i)<.*>")
 		{
@@ -39,7 +38,7 @@ class Watchdog_Base extends Map {
 			catch ; Once there's no more matches, it stops iterating
 				Break
 		}
-		msgbox "PropList`r`n" UDF.getPropsList(this) "`r`n" Input
+		; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
 		Return Input
 	}
 
@@ -54,63 +53,117 @@ class Watchdog_Base extends Map {
 	process_TimeString(Input) {
 		this.Set("TimeInfo", Map()) ;Call for a Set() so it doesn't call the __Item[] property
 			, this["TimeInfo"].CaseSense := "Off"
-			, this["TimeInfo"]["Months"] := RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
-			, this["TimeInfo"]["Days"] := RegExMatch(Input, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
-			, this["TimeInfo"]["Hours"] := RegExMatch(Input, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
-			, this["TimeInfo"]["Minutes"] := RegExMatch(Input, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
-			, this["TimeInfo"]["Seconds"] := RegExMatch(Input, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
-			, Input := this["TimeInfo"]["Months"] * 86400 * 30 + this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
-
+		If IsNumber(Input) {
+			Time := 20000101 ;Arbitrary midnight of any date
+			time := DateAdd(time, Integer(Input), "Seconds")
+				; msgbox Input//86400 "d" FormatTime(time, "H'h'mm'm's's'")
+				, this["TimeInfo"]["Days"] := Input // 86400
+				, this["TimeInfo"]["Hours"] := FormatTime(time, "H")
+				, this["TimeInfo"]["Minutes"] := FormatTime(time, "m")
+				, this["TimeInfo"]["Seconds"] := FormatTime(time, "s")  ;Enclosed in parentheses because auto formatter is funny at times
+			Return Input
+		}
+		; this["TimeInfo"]["Months"] := (RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0) ;Because I feel like it makes more sense for it to be up to days as the highest number
+		this["TimeInfo"]["Days"] := (RegExMatch(Input, "((?<Days>\d+)[Dd])", &Days) ? Days[2] : 0)
+			, this["TimeInfo"]["Hours"] := (RegExMatch(Input, "((?<Hours>\d+)[Hh])", &Hours) ? Hours[2] : 0)
+			, this["TimeInfo"]["Minutes"] := (RegExMatch(Input, "((?<Minutes>\d+)[m])", &Minutes) ? Minutes[2] : 0)
+			, this["TimeInfo"]["Seconds"] := (RegExMatch(Input, "((?<Seconds>\d+)[sS])", &Seconds) ? Seconds[2] : 0) ;Enclosed in parentheses because auto formatter is funny at times
+			, Input := this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
 		return Input
 	}
 	process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
 
-	transformString(Path,Type, encoding){ ; To transform a string path into a possibly JSON String
+	transformString(Path, Type, encoding) { ; To transform a string path into a possibly JSON String
 		if Path is file
+		{
+			JsonString := Path.read()
+			Try
+				Path.Close()
+			catch as E
 			{
-				JsonString := Path.read()
-				Try
-					Path.Close()
-				catch as E
-				{
-					msgbox(E.What)
-					return
-				}
+				msgbox(E.What)
+				return
 			}
-			else if Type = "File"
-				JsonString := fileread(Path, encoding)
+		}
+		else if Type = "File"
+			JsonString := fileread(Path, encoding)
 				, this.DefineProp("__path", { Value: Path })
-			else if Type = "Text"
-				JsonString := Path
-			else
-				throw ValueError("No matching data? Expects a path or string, but registered " Type, Type(this))
+		else if Type = "Text"
+			JsonString := Path
+		else
+			throw ValueError("No matching data? Expects a path or string, but registered " Type, Type(this))
 		return JXON.Load(JsonString)
 	}
-	mergeMap(InstRef,Map){
-		For k,v in Map
-			InstRef[k]:=v
+	mergeMap(InstRef, Map) {
+		For k, v in Map
+			InstRef[k] := v
 	}
-	
-	__Set(Name, Params, value){ ;Idk what Params do, so I'll leave it alone
-		super.%Name%:=value 
-			; So I don't need to specificaly call for Super when defining a property in the child classes. Hopefully I will find how to properly make it work with Params
+
+	renameKey(baseObject, OldKey, NewKey) {
+		baseObject[NewKey] := baseObject[OldKey]
+			, baseObject.Delete(OldKey)
 	}
 }
 
 Class TargetFile extends Watchdog_Base {
 	__New(Path, type := "Text", encoding := this._encoding) {
 		this.DefineProp("__path", { Value: StrLen(path) })
-		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-		, JsonMap:=this.transformString(Path,Type, encoding)
-		, this.mergeMap(this,JsonMap)
-			, this.Paths := Map()
-		For Key, A_Settings in this["Paths"] {
-			If !!(A_Settings["Skip"])
-				Continue
-			; Temp := WatchFile.WatchPath(A_Settings, Key, this)
-			; 	, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-			; 	, Temp.DeleteProp("Summary")
-			; 	, this.Paths[Key] := Temp
+			, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+			, JsonMap := this.transformString(Path, Type, encoding)
+			, this.mergeMap(this, JsonMap)
+			, this.Targets := this["Targets"]
+		DisplayMap(this.Targets)
+		For Key, A_Settings in this.Targets { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
+			Temp := TargetFile.TargetPath(A_Settings, Watcher, this)
+				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
+				, Temp.DeleteProp("Summarys")
+				, this.Paths[Watcher] := Temp
+		}
+	}
+
+	Class TargetPath Extends Watchdog_Base { ;; Auto Initialize a SubClass Instance in case there's the setting of a not defined Target Or Watcher
+		__New(InputSettings, Watcher, Parent) {
+			; msgbox Watcher " " A_LineNumber
+			this.DefineProp("__parent", { Value: Parent })
+				, this.DefineProp("__watcher", { Value: Watcher })
+			for Key, val in InputSettings
+				this[Key] := val
+
+			Return this
+		}
+
+		__Item[KeyName] {
+			set {
+				switch KeyName, 0 {
+					case "Source":
+						Val := Array()
+						, Value := Value is Array ? Value : Array(Value)
+						For _, v in Value {
+							v := this.process_AddEnding(v)
+								, v := this.process_Keywords(v)
+								, v := this.process_invalidKeywords(v)
+								, Val.Push(v)
+							; msgbox v " " A_LineNumber
+						}
+						Value := Val
+					case "TargetKeys":
+						Val := Array()
+						, Value := Value is Array ? Value : Array(Value)
+						For _, v in Value {
+							Val.Push(v)
+						}
+						Value := Val
+					case "TimeUp":
+						Value := this.process_TimeString(Value)
+					default:
+						If value is Object
+						{
+							err := ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), Type(this))
+								, msgbox(UDF.ErrorFormat(err))
+						}
+				}
+				Super[KeyName] := Value
+			}
 		}
 	}
 }
@@ -118,63 +171,69 @@ Class TargetFile extends Watchdog_Base {
 Class WatchFile Extends Watchdog_Base {
 	__New(Path, Type := "Text", encoding := this._encoding) {
 		this.DefineProp("__path", { Value: StrLen(path) })
-		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-		, JsonMap:=this.transformString(Path,Type, encoding)
-		, this.mergeMap(this,JsonMap)
-			, this.Paths := Map() ; so I can store the Watcher's data here
-		msgbox UDF.getPropsList(this)
-		For Watcher, A_Settings in this["Paths"] {
+			, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+			, JsonMap := this.transformString(Path, Type, encoding)
+			, this.mergeMap(this, JsonMap)
+			, this.Paths := this["Paths"] ; Creates a Pointer to Paths Settings
+		toDelete := []
+		For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
 			If !!(A_Settings["Skip"])
+			{
+				toDelete.push(Watcher)
 				Continue
+			}
 			Temp := WatchFile.WatchPath(A_Settings, Watcher, this)
 				, this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-				, Temp.DeleteProp("Summary")
+				, Temp.DeleteProp("Summarys")
 				, this.Paths[Watcher] := Temp
 		}
+		for key in toDelete
+			this.Paths.Delete(key)
 	}
-	; 
+	;
 
 	Class WatchPath Extends Watchdog_Base { ; Wrapper to process the watcher's parameters
 		CaseSense := 0
 
 		__New(InputSettings, Watcher, Parent) {
-			msgbox Watcher " " A_LineNumber
-			This.DefineProp("__parent", { Value : Parent})
-			 , this.DefineProp("__watcher", { Value : Watcher})
-			 for Key, val in InputSettings 
-			 	this[Key] := val
-			 
+			; msgbox Watcher " " A_LineNumber
+			this.DefineProp("__parent", { Value: Parent })
+				, this.DefineProp("__watcher", { Value: Watcher })
+			for Key, val in InputSettings
+				this[Key] := val
+
 			Return this
 		}
+
 		__Item[KeyName] {
 			set {
 				switch KeyName, 0 {
 					case "Source":
-						Val:=Array()
-						, Value:=Value is Array?Value:Array(Value)
-						For _,v in Value {
-							v := this.process_AddEnding(v) 
-							, v := this.process_Keywords(v)
-							, v := this.process_invalidKeywords(v)
-							, Val.Push(v)
-							msgbox v
+						Val := Array()
+						, Value := Value is Array ? Value : Array(Value)
+						For _, v in Value {
+							v := this.process_AddEnding(v)
+								, v := this.process_Keywords(v)
+								, v := this.process_invalidKeywords(v)
+								, Val.Push(v)
+							; msgbox v " " A_LineNumber
 						}
-						Value:=Val
+						Value := Val
 					case "TargetKeys":
-						Val:=Array()
-						, Value:=Value is Array?Value:Array(Value)
-						For _,v in Value {
+						Val := Array()
+						, Value := Value is Array ? Value : Array(Value)
+						For _, v in Value {
 							Val.Push(v)
 						}
-						Value:=Val
+						Value := Val
 					case "TimeUp":
 						Value := this.process_TimeString(Value)
 					default:
 						If value is Object
-							{
-								err:= ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), Type(this))
+						{
+							err := ValueError(this.__watcher "[" KeyName "] expects string, but got " Type(value), Type(this))
 								, msgbox(UDF.ErrorFormat(err))
-							}
+						}
 				}
 				Super[KeyName] := Value
 			}
@@ -183,8 +242,8 @@ Class WatchFile Extends Watchdog_Base {
 
 }
 
-WatchPaths:=""
-PathTargets:=""
+WatchPaths := ""
+PathTargets := ""
 Watchdog(InputTime := "") {
 
 	Global PathTargets, WatchPaths, _rn
