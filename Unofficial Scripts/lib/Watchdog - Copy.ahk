@@ -38,6 +38,8 @@ class Watchdog_Base extends Map {
         return Val
     }
 
+    InQuote(Input) => "`"" Input "`""
+
     LogFormat() {
         Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
     }
@@ -56,6 +58,25 @@ class Watchdog_Base extends Map {
             }
             catch ; Once there's no more matches, it stops iterating
                 Break
+        }
+        ; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
+        Return Input
+    }
+
+    process_CustomKeywords(Input, UDK) {
+        StartingPos := 0, KeyWords := Array()
+        While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &SubPat, StartingPos)
+        {
+            If !SubPat
+                break
+            KeyWords.Push(SubPat[1])
+        }
+        For Value in KeyWords {
+            if UDK.Has(Value)
+                Input := RegExReplace(Input, "i)<(" Value ")>", UDK[Value])
+            else
+                throw ValueError("<" this.InQuote(Value) "> isn't a defined key", Type(this), Input)
+            return Input
         }
         ; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
         Return Input
@@ -126,30 +147,41 @@ Class TargetFile extends Watchdog_Base {
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
-            , this.Targets := this["Targets"]
-        DisplayMap(this.Targets)
+            , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
+        ; , this.Targets := this["Targets"]
+        DisplayMap(this.Targets, A_LineNumber)
         For Key, A_Settings in this.Targets {
-            Temp := TargetFile.TargetPath(A_Settings, Watcher, this)
+            Temp := TargetFile.TargetPath(A_Settings, Key, this)
                 , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
                 , Temp.DeleteProp("Summarys")
-                , this.Paths[Watcher] := Temp
+                , this.Paths[Key] := Temp
         }
+
     }
 
-    __Item[KeyName] {
+    Class Configs extends Watchdog_Base {
+        __New(Configs, Parent) {
+            this.DefineProp("__parent", { Value: Parent })
+                , this.DefineProp("__original", { Value: Configs }) ; Stores a pointer to directly access the Original configs
+            for Key, A_Settings in Configs
+                this[key] := TargetFile.TargetPath(A_Settings, Key, this)
+            return this
+        }
 
-        get {
-            if this.Has(KeyName)
-                return this[KeyName]
-            return this[KeyName] := TargetFile.TargetPath("", KeyName, this)
+        __Item[KeyName] {
+            get {
+                if this.Has(KeyName)
+                    return this[KeyName]
+                return this[KeyName] := TargetFile.TargetPath("", KeyName, this)
+            }
         }
     }
-
     Class TargetPath Extends Watchdog_Base { ;; Auto Initialize a SubClass Instance in case there's the setting of a not defined Target Or Watcher
         __New(InputSettings, parentKey, Parent) {
             ; msgbox Watcher " " A_LineNumber
             this.DefineProp("__parent", { Value: Parent })
                 , this.DefineProp("__parentKey", { Value: parentKey })
+
             for Key, val in InputSettings
                 this[Key] := val
             Return this
@@ -169,7 +201,7 @@ Class TargetFile extends Watchdog_Base {
                     default:
                         If value is Object
                         {
-                            err := ValueError(this.__parentKey "[" KeyName "] expects string, but got " Type(value), Type(this))
+                            err := ValueError(this.InQuote(this.__parentKey) "[" KeyName "] expects string, but got " Type(value), Type(this))
                                 , msgbox(UDF.ErrorFormat(err))
                         }
                 }
@@ -179,38 +211,47 @@ Class TargetFile extends Watchdog_Base {
     }
 }
 
+
 Class WatchFile Extends Watchdog_Base {
     __New(Path, Type := "Text", encoding := this._encoding) {
         this.DefineProp("__path", { Value: StrLen(path) })
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
-            , this.Paths := this["Paths"] ; Creates a Pointer to Paths Settings
-        toDelete := []
-        For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
-            If !!(A_Settings["Skip"])
+            , WatcherConfigs:= this["WatcherConfigs"]
+            , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; This will leave an un-edited version of this["Paths"]
+
+        ; For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
+
+        ;     Temp := WatchFile.Configs(A_Settings, Watcher, this)
+        ;         , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
+        ;         , Temp.DeleteProp("Summarys")
+        ;         , this.Paths[Watcher] := Temp
+        ; }
+    }
+
+    Class Configs extends Watchdog_Base {
+        __New(Configs, Parent) {
+            this.DefineProp("__parent", { Value: Parent })
+                , this.DefineProp("__original", { Value: Configs }) ; Stores a pointer to directly access the Original configs
+            toDelete := []
+            for Key, A_Settings in Configs
             {
-                toDelete.push(Watcher)
-                Continue
+                If !!(A_Settings["Skip"])
+                    Continue
+                this[key] := WatchFile.WatchPath(A_Settings, Key, this)
             }
-            Temp := WatchFile.WatchPath(A_Settings, Watcher, this)
-                , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-                , Temp.DeleteProp("Summarys")
-                , this.Paths[Watcher] := Temp
+            return this
         }
-        for key in toDelete
-            this.Paths.Delete(key)
-    }
 
-    __Item[KeyName] {
-
-        get {
-            if this.Has(KeyName)
-                return this[KeyName]
-            return this[KeyName] := WatchFile.WatchPath("", KeyName, this)
+        __Item[KeyName] {
+            get {
+                if this.Has(KeyName)
+                    return this[KeyName]
+                return this[KeyName] := WatchFile.WatchPath("", KeyName, this)
+            }
         }
     }
-
     Class WatchPath Extends Watchdog_Base { ; Wrapper to process the watcher's parameters
         CaseSense := 0
 
@@ -264,9 +305,8 @@ Class WatchFile Extends Watchdog_Base {
 Class Strega_Watcher {
     History_CountThreshold := 50
     __New(PathsObj, TargetObj) {
-        this.DefineProp("Paths", { Value: PathsObj }),
-            this.DefineProp("Targets", { Value: TargetObj })
-
+        this.DefineProp("Paths", { Value: PathsObj })
+            , this.DefineProp("Targets", { Value: TargetObj })
         return this
     }
     LogFormat(Detail, Result, InfoType, Time := A_Now) => Format("[{1}]({2}){3}",
@@ -280,17 +320,21 @@ Class Strega_Watcher {
         set {
             Static Count := 0
             Count += CountStep
-                , this._History .= this.LogFormat(Detail, Value, InfoType "[" Count "]")
-            
+                , this._History := this.History this.LogFormat(Detail, Value, InfoType "[" Count "]")
+
             if !Dump and (Mod(Count, 50) and Count > 0)
                 Return
-            
+            this.Dump(this.History),
+                this._History := ""
         }
         get {
             try
                 return this._History
             catch
-                return ""
+                return this._History := Format("[{}]`r`n",
+                    FormatTime(A_Now, "yyyy/MM/dd HH:mm:ss")
+                )
+
         }
     }
 }

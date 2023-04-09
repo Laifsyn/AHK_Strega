@@ -5,32 +5,51 @@
 #Include <Watchdog - Copy>
 
 
+; myString := Map()
+; mystring["Text"] := "C:\<Macro>\Basic 1\Test\<A_Mons>\<userDefin>"
 
 
+; UDK := Map("A_Mon", A_Mon, "Macro", "it's Macro", "userDefin", "Marvelous", "A_Monss" , 234)
+; mystring["Text"]:=myfunc(mystring["Text"],UDK)
+; msgbox mystring["Text"]
 
+; myfunc(Input, UDK) {
+;     StartingPos := 1, myKeys := []
+;     While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &RefObj, StartingPos) + 1
+;     {
+;         if !RefObj
+;             break
+;         myKeys.Push(RefObj[1])
+;     }
+;     For Value in myKeys
+;         if UDK.Has(Value)
+;             Input := RegExReplace(Input, "i)<(" Value ")>", UDK[Value])
+;         else
+;             throw ValueError( "<" Value "> Isn't a defined keyword!", Type(myKeys), Input)
+;     return Input
+; }
 
-
-; WatchPath:=WatchFile(A_WorkingDir "\configs\Paths.json","File")
-; DisplayMap(WatchPath, A_LineNumber)
-TargetPath:=TargetFile(A_WorkingDir "\configs\Targets.json","File")
+WatchPath := WatchFile(A_WorkingDir "\configs\Paths.json", "File")
+DisplayMap(WatchPath, A_LineNumber)
+TargetPath := TargetFile(A_WorkingDir "\configs\Targets.json", "File")
 DisplayMap(TargetPath, A_LineNumber)
-_rn:="`r`n"
+_rn := "`r`n"
 ; Something:=Ini("UDF IniRead.ini")
 ; text
 
-x:=&y
-y:=5
+x := &y
+y := 5
 ;msgbox %x%
-something:=Object()
-something.Targets:=&Target
-something.Maps:=Map("asd", &Target)
+something := Object()
+something.Targets := &Target
+something.Maps := Map("asd", &Target)
 something.Target := &Target
 ; something:=&Target
 ; something.Targets:=Target
 
 exit
 
-Target:=JXON.Load("
+Target := JXON.Load("
 (
 {
     "Key" : [12323,2,3,4],
@@ -39,12 +58,12 @@ Target:=JXON.Load("
 }
 )")
 
-something.Key:= %something.Target%["Key"]
-something.Key2:= %something.Target%["Key2"]
+something.Key := %something.Target%["Key"]
+something.Key2 := %something.Target%["Key2"]
 DisplayMap(%something.Target%)
-something.key2[1]:=5433432
+something.key2[1] := 5433432
 ; Target["Key"][1]:=300003
-; try 
+; try
 ; msgbox %something.Targets%["Key"][1]
 ; msgbox Target["Key"][1]
 
@@ -69,8 +88,7 @@ msgbox something.key2[1]
 ;     MsgBox UDF.ErrorFormat(err)
 
 
-
-Test:=Toml().read("
+Test := Toml().read("
 (
     Object1 = "LoadTes"
     "!Available Actions(Comment)" = [ "Move" ]
@@ -128,14 +146,14 @@ Test:=Toml().read("
     
 )"
 ).toMap()
-for k,v in Test["Paths"]
+for k, v in Test["Paths"]
     try
-        msgbox k " " 
-var:=FileRead("configs\Paths.json")
-var:=JXON.Load(var)
+        msgbox k " "
+var := FileRead("configs\Paths.json")
+var := JXON.Load(var)
 msgbox "sad"
 ; msgbox var
-text:=""
+text := ""
 ; s:=Test.values["a"]["c"]["e"]["g"]["i"]["j"]
 ; for k,v in s
 ;     text.=Format("[{}]:={}`r`n",k, IsObject(v)?"object":v)
@@ -145,12 +163,12 @@ text:=""
 ;     text.=Format("[{}]:={}`r`n",k, IsObject(v)?"object":v)
 ; msgbox Text
 ; msgbox Test.Values["company"]["website"]
-DisplayMap(test,A_LineNumber,4)
+DisplayMap(test, A_LineNumber, 4)
 SetListVars(Text)
 class Ini extends Map {
     CaseSense := "Off" ; Because since I'm using it to store Window's Folder paths etc, case sense isn't a necessity
     SpecialChar := "¤"
-        __FileEncoding := "UTF-16"
+    __FileEncoding := "UTF-16"
 
 
     __New(Path) {
@@ -453,5 +471,4 @@ class Ini extends Map {
 }
 
 
-
-^r::Reload
+^r:: Reload
