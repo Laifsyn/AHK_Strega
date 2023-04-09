@@ -30,11 +30,10 @@ class Watchdog_Base extends Map {
 
     CloneMap(InputMap) { ; Still experimenting if it works
         Val := InputMap.Clone()
-        { for k, v in Val
-            {
-                if (v is Object)
-                    val[k] := this.CloneMap(v)
-            } }
+        for k, v in Val
+            if (v is Object)
+                val[k] := this.CloneMap(v)
+
         return Val
     }
 
@@ -129,10 +128,10 @@ Class TargetFile extends Watchdog_Base {
             , this.Targets := this["Targets"]
         DisplayMap(this.Targets)
         For Key, A_Settings in this.Targets {
-            Temp := TargetFile.TargetPath(A_Settings, Watcher, this)
+            Temp := TargetFile.TargetPath(A_Settings, Key, this)
                 , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
                 , Temp.DeleteProp("Summarys")
-                , this.Paths[Watcher] := Temp
+                , this.Paths[Key] := Temp
         }
     }
 
@@ -278,20 +277,28 @@ Class Strega_Watcher {
 
     History[Detail := "", InfoType := "LOG", CountStep := 1, Dump := 0] {
         set {
-            Static Count := 0
-            Count += CountStep
-                , this._History .= this.LogFormat(Detail, Value, InfoType "[" Count "]")
-            
-            if !Dump and (Mod(Count, 50) and Count > 0)
+            Static Count := 0, lastDump, HistoryCycles := 0, Summary := { Index: 1, Content: "" }
+            HistoryCycles += 1
+                , Count += CountStep
+                , this._History .= this.LogFormat(Detail, Value, InfoType "[" HistoryCycles "]")
+            if !Dump and (Mod(Count, this.History_CountThreshold) and Count > 0)
                 Return
-            
+            Summary.Index += 1
+                , Summary.Content := this.LogFormat(, "Summary Index with " . (Count - lastDump) . " Lines"
+                    , InfoType "[" Summary.Index "]")
+                , this.dumpLog(this._History Summary.Content)
+                , this._History := ""
+                , lastDump := Count
         }
         get {
             try
                 return this._History
             catch
-                return ""
+                return this._History := this.LogFormat(, "Initializing history.`r`n", "INITIALIZING") ; since it doesn't exists, better let it have info
         }
+    }
+    dumpLog(Content) {
+
     }
 }
 
