@@ -11,7 +11,7 @@
 		"Calculo" : {
 					
 			"SearchKeys" : ["Converted"],
-			"Target" : "C:\\Macro\\Basic 1\\Test\\<A_Mon>",
+			"Target" : "C:\\Macro\\Basic 1\\Test\\<A_Mon>\\<myName1>",
 			"Action" : "Move" ,
 			"Type" : "Keyword" ,
 			"SortByDate" : 1 ,

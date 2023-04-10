@@ -23,7 +23,7 @@
 			},
 		"Watch_3" : {
 			"Skip" : 0,
-			"Source" : ["C:\\Users\\<UserName>\\Downloads\\Other\\*"],
+			"Source" : [";C:\\Users\\<UserName>\\Downloads\\Other\\*"],
 			"isPath" : true,
 			"TargetKeys" : ["Images"],
 			"Description" : "Path to Watch over",
@@ -31,8 +31,7 @@
 			"Age_asCountdown": 1
 			}
 		},
-	"Object1" : "LoadTes",
-	"!Available Actions(Comment)" : ["Move"],
+	"UserDefined":{},
 	"Available Common Keywords(Comment)" : ["<A_DD>", "<A_MM>", "<A_YYYY>", "<A_UserName>", "<A_Desktop>" , 
 	"<A_MyDocuments>", "<A_AppData>" , "<A_ComputerName>" , "<A_DDD>", "<A_DDDD>", 
 	"<A_WDay>", "<A_MMMM>", "<A_Mon>", "<A_MMM>", "<A_YDay>", "<A_YWeek>"

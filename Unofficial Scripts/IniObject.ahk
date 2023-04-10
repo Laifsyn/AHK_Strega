@@ -30,9 +30,11 @@
 ; }
 
 WatchPath := WatchFile(A_WorkingDir "\configs\Paths.json", "File")
-DisplayMap(WatchPath, A_LineNumber)
+; DisplayMap(WatchPath.Paths, A_LineNumber)
 TargetPath := TargetFile(A_WorkingDir "\configs\Targets.json", "File")
-DisplayMap(TargetPath, A_LineNumber)
+; DisplayMap(TargetPath.Targets, A_LineNumber)
+Watcher:=Strega_Watcher(WatchPath,TargetPath)
+watcher.doProcedure()
 _rn := "`r`n"
 ; Something:=Ini("UDF IniRead.ini")
 ; text
@@ -471,4 +473,4 @@ class Ini extends Map {
 }
 
 
-^r:: Reload
+!^r:: Reload

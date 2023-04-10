@@ -64,8 +64,8 @@ class Watchdog_Base extends Map {
     }
 
     process_CustomKeywords(Input, UDK) {
-        StartingPos := 0, KeyWords := Array()
-        While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &SubPat, StartingPos)
+        StartingPos := 1, KeyWords := Array()
+        While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &SubPat, StartingPos) + 1
         {
             If !SubPat
                 break
@@ -74,9 +74,8 @@ class Watchdog_Base extends Map {
         For Value in KeyWords {
             if UDK.Has(Value)
                 Input := RegExReplace(Input, "i)<(" Value ")>", UDK[Value])
-            else
-                throw ValueError("<" this.InQuote(Value) "> isn't a defined key", Type(this), Input)
-            return Input
+            ; else
+            ;     throw ValueError("<" this.InQuote(Value) "> isn't a defined key", Type(this), Input)
         }
         ; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
         Return Input
@@ -148,15 +147,6 @@ Class TargetFile extends Watchdog_Base {
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
             , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
-        ; , this.Targets := this["Targets"]
-        DisplayMap(this.Targets, A_LineNumber)
-        For Key, A_Settings in this.Targets {
-            Temp := TargetFile.TargetPath(A_Settings, Key, this)
-                , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-                , Temp.DeleteProp("Summarys")
-                , this.Paths[Key] := Temp
-        }
-
     }
 
     Class Configs extends Watchdog_Base {
@@ -195,9 +185,15 @@ Class TargetFile extends Watchdog_Base {
                         , Value := Value is Array ? Value : Array(Value)
                         For _, v in Value {
                             v := this.process_Keywords(v)
+                                , this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
                                 , Val.Push(v)
                         }
                         Value := Val
+                    case "Target":
+                        v := Value
+                        , v := this.process_Keywords(v)
+                        , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
+                        , value := v
                     default:
                         If value is Object
                         {
@@ -211,14 +207,13 @@ Class TargetFile extends Watchdog_Base {
     }
 }
 
-
 Class WatchFile Extends Watchdog_Base {
     __New(Path, Type := "Text", encoding := this._encoding) {
         this.DefineProp("__path", { Value: StrLen(path) })
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
-            , WatcherConfigs:= this["WatcherConfigs"]
+            , WatcherConfigs := this["WatcherConfigs"]
             , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; This will leave an un-edited version of this["Paths"]
 
         ; For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
@@ -239,7 +234,11 @@ Class WatchFile Extends Watchdog_Base {
             {
                 If !!(A_Settings["Skip"])
                     Continue
-                this[key] := WatchFile.WatchPath(A_Settings, Key, this)
+                Temp := WatchFile.WatchPath(A_Settings, Key, this)
+                if !Temp["Source"].Length
+                    Continue
+                this[key] := Temp
+
             }
             return this
         }
@@ -272,10 +271,17 @@ Class WatchFile Extends Watchdog_Base {
                         Val := Array()
                         , Value := Value is Array ? Value : Array(Value)
                         For _, v in Value {
+                            if InStr(v, ";", , (-StrLen(v)))
+                                continue
                             v := this.process_AddEnding(v)
                                 , v := this.process_Keywords(v)
+                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
+                                , oldv := v
                                 , v := this.process_invalidKeywords(v)
-                                , Val.Push(v)
+                            if FileExist(v)
+                                Val.Push(v)
+                            else
+                                throw ValueError("File path doesn't exists! " v "`r`nYou can add a ';' at the start to ignore the key", , Format("Watcher[`"{}`"]({}):={}", this.__parentKey, A_Index, oldv))
                             ; msgbox v " " A_LineNumber
                         }
                         Value := Val
@@ -305,8 +311,13 @@ Class WatchFile Extends Watchdog_Base {
 Class Strega_Watcher {
     History_CountThreshold := 50
     __New(PathsObj, TargetObj) {
-        this.DefineProp("Paths", { Value: PathsObj })
-            , this.DefineProp("Targets", { Value: TargetObj })
+        this.DefineProp("startUp", { Value: A_Now })
+            ; , this.DefineProp("Watchers", { Value: PathsObj })
+            ; , this.DefineProp("Targets", { Value: TargetObj })
+            ; In case I need a pointer to the original Obj. Otherwise this should suffice
+            , this.DefineProp("Watchers", { Value: PathsObj.Paths })
+            , this.DefineProp("Targets", { Value: TargetObj.Targets })
+
         return this
     }
     LogFormat(Detail, Result, InfoType, Time := A_Now) => Format("[{1}]({2}){3}",
@@ -314,8 +325,28 @@ Class Strega_Watcher {
         InfoType,
         ResultInfo := Detail = "" ? Result : Detail " ≡ " Result
     )
+    doProcedure() {
+        this.procedureIndex += 1
+        DisplayMap(this.Watchers)
+        DisplayMap(this.Targets)
 
+        for Watcher, A_watcherSettings in this.Watchers
+            DisplayMap(A_watcherSettings)
+    }
+    Dump(content) {
 
+    }
+    procedureIndex {
+        set {
+            this._procedureIndex := value
+        }
+        get {
+            try
+                return this._procedureIndex
+            catch
+                return this.procedureIndex := 0
+        }
+    }
     History[Detail := "", InfoType := "LOG", CountStep := 1, Dump := 0] {
         set {
             Static Count := 0
