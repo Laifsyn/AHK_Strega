@@ -162,7 +162,7 @@ Class TargetFile extends Watchdog_Base {
             get {
                 if this.Has(KeyName)
                     return this[KeyName]
-                return this[KeyName] := TargetFile.TargetPath("", KeyName, this)
+                return this[KeyName] := TargetFile.TargetPath("s", KeyName, this)
             }
         }
     }
@@ -171,8 +171,8 @@ Class TargetFile extends Watchdog_Base {
             ; msgbox Watcher " " A_LineNumber
             this.DefineProp("__parent", { Value: Parent })
                 , this.DefineProp("__parentKey", { Value: parentKey })
-
-            for Key, val in InputSettings
+                , this.DefineProp("__setting", { Value: InputSettings })
+            for Key, val in this.__setting
                 this[Key] := val
             Return this
         }
@@ -185,9 +185,10 @@ Class TargetFile extends Watchdog_Base {
                         , Value := Value is Array ? Value : Array(Value)
                         For _, v in Value {
                             v := this.process_Keywords(v)
-                                , this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
-                                , Val.Push(v)
+                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
+                                Val.Push(v)
                         }
+                        Val := this.process_Targets(this.__setting["Type"], Val*)
                         Value := Val
                     case "Target":
                         v := Value
@@ -203,6 +204,34 @@ Class TargetFile extends Watchdog_Base {
                 }
                 Super[KeyName] := Value
             }
+        }
+
+        process_Targets(InputType, Value*) { ; This is to convert Filetype/Keyword Keywords into a single RegEx
+            temp := "", RegEx := Array()
+
+            For Val in Value {
+                if (Val ~= "r/.*/")
+                {
+                    RegEx.Push(Val)
+                    continue
+                }
+                temp .= val "|"
+            }
+            temp := "(" Trim(temp, "|") ")"
+            switch InputType, 0 {
+                case "Filetype":
+                    temp:= "i)\." temp "$"
+                case "Keyword": 
+                    temp:= "i)" temp "(?=.*\.[^\.]+)$" 
+                case "Mixed": ;does nothing. 
+                default:
+                    throw ValueError("Unknown Type! Expects `"Filetype`" or `"Keyword`"", Type(this), "TargetKey [" this.__parentKey "]:=" this.InQuote(InputType))
+            }
+            if RegEx.Length
+                this.__setting["Type"]:="Mixed" ;Might actually need to do something different in case they aren't mixed
+                    ;i.e. use InStr instead of a regex
+            RegEx.InsertAt(1,temp)
+            return RegEx
         }
     }
 }
@@ -331,7 +360,7 @@ Class Strega_Watcher {
         DisplayMap(this.Targets)
 
         for Watcher, A_watcherSettings in this.Watchers
-            DisplayMap(A_watcherSettings)
+            DisplayMap(A_watcherSettings, A_LineNumber)
     }
     Dump(content) {
 
