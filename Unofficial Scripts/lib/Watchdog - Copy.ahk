@@ -186,10 +186,11 @@ Class TargetFile extends Watchdog_Base {
                         For _, v in Value {
                             v := this.process_Keywords(v)
                                 , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
-                                Val.Push(v)
+                            Val.Push(v)
                         }
-                        Val := this.process_Targets(this.__setting["Type"], Val*)
+                        Val := this.refine_Targets(this.__setting["Type"], Val*)
                         Value := Val
+                        DisplayMap(Value,A_LineNumber "`r`n" this.Type,1)
                     case "Target":
                         v := Value
                         , v := this.process_Keywords(v)
@@ -206,31 +207,37 @@ Class TargetFile extends Watchdog_Base {
             }
         }
 
-        process_Targets(InputType, Value*) { ; This is to convert Filetype/Keyword Keywords into a single RegEx
+        refine_Targets(InputType, A_TargetValues*) { ; This is to convert Filetype/Keyword Keywords into a single RegEx if possible. This should solve cases when data is updated on the run
             temp := "", RegEx := Array()
 
-            For Val in Value {
-                if (Val ~= "r/.*/")
+            For Val in A_TargetValues {
+                if RegExMatch(Val ,"r/(.*)/(.*)", &SubPat)
                 {
+                    vil := Map()
+                    msgbox SubPat[1] "/" SubPat[2] ;Should I Store the RegEx as an array inside a property of this? idk tbh. Might figure it later
+
                     RegEx.Push(Val)
                     continue
                 }
                 temp .= val "|"
             }
             temp := "(" Trim(temp, "|") ")"
-            switch InputType, 0 {
-                case "Filetype":
-                    temp:= "i)\." temp "$"
-                case "Keyword": 
-                    temp:= "i)" temp "(?=.*\.[^\.]+)$" 
-                case "Mixed": ;does nothing. 
-                default:
-                    throw ValueError("Unknown Type! Expects `"Filetype`" or `"Keyword`"", Type(this), "TargetKey [" this.__parentKey "]:=" this.InQuote(InputType))
-            }
-            if RegEx.Length
-                this.__setting["Type"]:="Mixed" ;Might actually need to do something different in case they aren't mixed
-                    ;i.e. use InStr instead of a regex
-            RegEx.InsertAt(1,temp)
+            if RegEx.Length ;will replace >this.__setting["Type"]< so to store as a temporal value of the result type of the refinement
+                this.type := "Mixed"
+            else
+                this.type := InputType
+            If (this.Type = "Mixed") { ; it matters to know if it's mixed, so It can work with A_LoopFileName without issues
+                switch InputType, 0 { ; Case Insensitive - Checks for the original Expected InputType
+                    case "Filetype":
+                        temp := "iS)\." temp "$"
+                    case "Keyword":
+                        temp := "iS)" temp "(?=.*\.[^\.]+)$"
+                    default:
+                        throw ValueError("Unknown Type! Expects `"Filetype`" or `"Keyword`"", Type(this), "TargetKey [" this.__parentKey "]:=" this.InQuote(InputType))
+                } }
+            else
+                temp:= "iS)" temp
+                RegEx.InsertAt(1, temp)
             return RegEx
         }
     }

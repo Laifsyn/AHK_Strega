@@ -4,36 +4,41 @@
 #Include <UDF>
 #Include <Watchdog - Copy>
 
-
-; myString := Map()
-; mystring["Text"] := "C:\<Macro>\Basic 1\Test\<A_Mons>\<userDefin>"
-
-
-; UDK := Map("A_Mon", A_Mon, "Macro", "it's Macro", "userDefin", "Marvelous", "A_Monss" , 234)
-; mystring["Text"]:=myfunc(mystring["Text"],UDK)
-; msgbox mystring["Text"]
-
-; myfunc(Input, UDK) {
-;     StartingPos := 1, myKeys := []
-;     While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &RefObj, StartingPos) + 1
-;     {
-;         if !RefObj
-;             break
-;         myKeys.Push(RefObj[1])
+; loop files A_Desktop "\*" , "F"
+; msgbox A_LoopFileShortName
+; msgbox "Finished"
+; Class myTest extends map {
+;     __New() {
+;         this["testKey"] := [1, 2]
 ;     }
-;     For Value in myKeys
-;         if UDK.Has(Value)
-;             Input := RegExReplace(Input, "i)<(" Value ")>", UDK[Value])
-;         else
-;             throw ValueError( "<" Value "> Isn't a defined keyword!", Type(myKeys), Input)
-;     return Input
+
+;     __Item[keyname] {
+;         set {
+;             if KeyName = "testKey" {
+;                 temp := Array()
+;                 tempN := ""
+;                 for _, v in Value {
+;                     if v is Number
+;                         tempN.=v "|"
+;                     else
+;                         temp.Push(v)
+;                 }
+;                 TempN:=Trim(TempN, "|")
+;                 tempOldLen:=temp.Length
+;                 temp.InsertAt(1,tempN)
+;                 msgbox tempN "< >" tempOldLen "`r`n" DisplayMap(temp,A_LineNumber,1)
+;                 val:=temp
+;             }
+;             Super[keyname] := val
+;         }
+;     }
 ; }
 
 WatchPath := WatchFile(A_WorkingDir "\configs\Paths.json", "File")
 ; DisplayMap(WatchPath.Paths, A_LineNumber)
 TargetPath := TargetFile(A_WorkingDir "\configs\Targets.json", "File")
 ; DisplayMap(TargetPath.Targets, A_LineNumber)
-Watcher:=Strega_Watcher(WatchPath,TargetPath)
+Watcher := Strega_Watcher(WatchPath, TargetPath)
 watcher.doProcedure()
 _rn := "`r`n"
 ; Something:=Ini("UDF IniRead.ini")
