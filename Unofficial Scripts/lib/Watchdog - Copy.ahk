@@ -161,7 +161,7 @@ Class TargetFile extends Watchdog_Base {
         __Item[KeyName] {
             get {
                 if this.Has(KeyName)
-                    return this[KeyName]
+                    return super[KeyName] ;Changed to Super to avoid Infinite Recursion
                 return this[KeyName] := TargetFile.TargetPath("s", KeyName, this)
             }
         }
@@ -188,9 +188,8 @@ Class TargetFile extends Watchdog_Base {
                                 , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
                             Val.Push(v)
                         }
-                        Val := this.refine_Targets(this.__setting["Type"], Val*)
+                        this.Targets := this.refine_Targets(this.__setting["Type"], Val*)
                         Value := Val
-                        DisplayMap(Value,A_LineNumber "`r`n" this.Type,1)
                     case "Target":
                         v := Value
                         , v := this.process_Keywords(v)
@@ -211,11 +210,8 @@ Class TargetFile extends Watchdog_Base {
             temp := "", RegEx := Array()
 
             For Val in A_TargetValues {
-                if RegExMatch(Val ,"r/(.*)/(.*)", &SubPat)
+                if RegExMatch(Val, "r/(.*)/(.*)", &SubPat)
                 {
-                    vil := Map()
-                    msgbox SubPat[1] "/" SubPat[2] ;Should I Store the RegEx as an array inside a property of this? idk tbh. Might figure it later
-
                     RegEx.Push(Val)
                     continue
                 }
@@ -236,8 +232,8 @@ Class TargetFile extends Watchdog_Base {
                         throw ValueError("Unknown Type! Expects `"Filetype`" or `"Keyword`"", Type(this), "TargetKey [" this.__parentKey "]:=" this.InQuote(InputType))
                 } }
             else
-                temp:= "iS)" temp
-                RegEx.InsertAt(1, temp)
+                temp := "iS)" temp
+            RegEx.InsertAt(1, temp)
             return RegEx
         }
     }
@@ -280,10 +276,13 @@ Class WatchFile Extends Watchdog_Base {
         }
 
         __Item[KeyName] {
+            set {
+                super[KeyName] := Value
+            }
             get {
                 if this.Has(KeyName)
-                    return this[KeyName]
-                return this[KeyName] := WatchFile.WatchPath("", KeyName, this)
+                    return super[KeyName] ;Has to use Super otherwise it will infinitely recurse.
+                return this[KeyName] := WatchFile.WatchPath(Map(), KeyName, this)
             }
         }
     }
@@ -309,15 +308,16 @@ Class WatchFile Extends Watchdog_Base {
                         For _, v in Value {
                             if InStr(v, ";", , (-StrLen(v)))
                                 continue
-                            v := this.process_AddEnding(v)
-                                , v := this.process_Keywords(v)
-                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
+                            v := this.process_Keywords(v)
                                 , oldv := v
-                                , v := this.process_invalidKeywords(v)
-                            if FileExist(v)
+                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
+                                , v := this.process_invalidKeywords(v) ; It means that "C:\<sometext\*>" → "C:\sometext\*"
+                            if FileExist(Trim(v, "*\")) ;Trim it because "Path\*" can be wonky
                                 Val.Push(v)
                             else
-                                throw ValueError("File path doesn't exists! " v "`r`nYou can add a ';' at the start to ignore the key", , Format("Watcher[`"{}`"]({}):={}", this.__parentKey, A_Index, oldv))
+                                throw ValueError("File path doesn't exists! " v "`r`nYou can add a ';' at the start to ignore the key",
+                                    , Format("Watcher[`"{}`"](Item no.{}):={}", this.__parentKey, A_Index, oldv))
+                            v := this.process_AddEnding(v)
                             ; msgbox v " " A_LineNumber
                         }
                         Value := Val
@@ -363,11 +363,22 @@ Class Strega_Watcher {
     )
     doProcedure() {
         this.procedureIndex += 1
-        DisplayMap(this.Watchers)
-        DisplayMap(this.Targets)
-
-        for Watcher, A_watcherSettings in this.Watchers
-            DisplayMap(A_watcherSettings, A_LineNumber)
+        ; DisplayMap(this.Watchers, A_LineNumber)
+        ; DisplayMap(this.Targets, A_LineNumber)
+        ; * This will iterate over Paths.json[Paths].Watchers→Settings
+        for Watcher, Settings in this.Watchers
+        {
+            this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
+            ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
+            this.Watchers["Watch_1"]["isPath"] := 78872478
+            displaymap(this._Watcher.Value, A_LineNumber, 1)
+            DisplayMap(Settings, A_LineNumber)
+            ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
+            for Source in this._Watcher.Value["Source"]
+            {
+                msgbox Source " "
+            }
+        }
     }
     Dump(content) {
 

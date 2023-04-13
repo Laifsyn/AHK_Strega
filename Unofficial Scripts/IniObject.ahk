@@ -4,6 +4,7 @@
 #Include <UDF>
 #Include <Watchdog - Copy>
 
+msgbox A_UserName
 ; loop files A_Desktop "\*" , "F"
 ; msgbox A_LoopFileShortName
 ; msgbox "Finished"
