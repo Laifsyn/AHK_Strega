@@ -312,12 +312,12 @@ Class WatchFile Extends Watchdog_Base {
                                 , oldv := v
                                 , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
                                 , v := this.process_invalidKeywords(v) ; It means that "C:\<sometext\*>" → "C:\sometext\*"
+                                , v := this.process_AddEnding(v)
                             if FileExist(Trim(v, "*\")) ;Trim it because "Path\*" can be wonky
                                 Val.Push(v)
                             else
                                 throw ValueError("File path doesn't exists! " v "`r`nYou can add a ';' at the start to ignore the key",
                                     , Format("Watcher[`"{}`"](Item no.{}):={}", this.__parentKey, A_Index, oldv))
-                            v := this.process_AddEnding(v)
                             ; msgbox v " " A_LineNumber
                         }
                         Value := Val
@@ -353,14 +353,34 @@ Class Strega_Watcher {
             ; In case I need a pointer to the original Obj. Otherwise this should suffice
             , this.DefineProp("Watchers", { Value: PathsObj.Paths })
             , this.DefineProp("Targets", { Value: TargetObj.Targets })
+            , DllCall("QueryPerformanceFrequency", "Int64*", &freq := 0)
+            , this.freq := freq
+            , this.DefineProp("Ticks", { Value: Object() })
 
         return this
     }
+
+    QPC(Counter := "", Decimals := 2) {
+        If Counter = ""
+        {
+            DllCall("QueryPerformanceCounter", "Int64*", &Counter := 0)
+            return Counter
+        }
+        DllCall("QueryPerformanceCounter", "Int64*", &CounterAfter := 0)
+        return Round((CounterAfter - Counter) / this.freq * 1000, Decimals)
+    }
+
     LogFormat(Detail, Result, InfoType, Time := A_Now) => Format("[{1}]({2}){3}",
         Format("{}.{}", FormatTime(Time, "HH:mm:ss"), A_MSec)
         InfoType,
         ResultInfo := Detail = "" ? Result : Detail " ≡ " Result
     )
+
+    FormatSeconds(Input) {
+        Time := 20000101 ;Arbitrary midnight of any date
+            , Time := DateAdd(Time, Integer(Input), "Seconds")
+        return (Input // 86400) " Days" FormatTime(time, " HH:mm:ss")
+    }
     doProcedure() {
         this.procedureIndex += 1
         ; DisplayMap(this.Watchers, A_LineNumber)
@@ -368,17 +388,32 @@ Class Strega_Watcher {
         ; * This will iterate over Paths.json[Paths].Watchers→Settings
         for Watcher, Settings in this.Watchers
         {
+            ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
             this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
-            ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
-            this.Watchers["Watch_1"]["isPath"] := 78872478
-            displaymap(this._Watcher.Value, A_LineNumber, 1)
-            DisplayMap(Settings, A_LineNumber)
+            ; displaymap(this._Watcher.Value, A_LineNumber, 1)
+            ; DisplayMap(Settings, A_LineNumber)
             ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
             for Source in this._Watcher.Value["Source"]
             {
-                msgbox Source " "
+                this.Ticks.Folder := this.QPC()
+                loop files Source, "F"
+                {
+                    this.store_FileInstance() ;this is to store the Loop Files variables into an object
+                    msgbox this.FormatSeconds(DateDiff(A_Now, this.LF.timeModified, "s"))
+                }
+
             }
         }
+    }
+    store_FileInstance() {
+        fileObj := Object()
+            , fileObj.fullName := A_LoopFileName, fileObj.ext := A_LoopFileExt
+            , fileObj.name := RegExReplace(fileObj.fullName, "\..*$", "")
+            , fileObj.fullPath := A_LoopFileFullPath, fileObj.path := A_LoopFileDir
+            ; , fileObj.timeAccess := A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
+            , fileObj.timeModified := A_LoopFileTimeModified
+        ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
+        this.DefineProp("LF", { value: fileObj })
     }
     Dump(content) {
 

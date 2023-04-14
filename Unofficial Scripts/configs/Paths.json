@@ -23,7 +23,7 @@
 			},
 		"Watch_3" : {
 			"Skip" : 0,
-			"Source" : ["C:\\Users\\<A_UserName>\\Downloads\\Other"],
+			"Source" : ["C:\\Users\\<A_UserName>\\Downloads\\Other\\"],
 			"isPath" : true,
 			"TargetKeys" : ["Images"],
 			"Description" : "Path to Watch over",
