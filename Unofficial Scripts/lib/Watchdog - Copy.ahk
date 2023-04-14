@@ -386,24 +386,31 @@ Class Strega_Watcher {
         ; DisplayMap(this.Watchers, A_LineNumber)
         ; DisplayMap(this.Targets, A_LineNumber)
         ; * This will iterate over Paths.json[Paths].Watchers→Settings
-        for Watcher, Settings in this.Watchers
-        {
-            ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
-            this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
-            ; displaymap(this._Watcher.Value, A_LineNumber, 1)
-            ; DisplayMap(Settings, A_LineNumber)
-            ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
-            for Source in this._Watcher.Value["Source"]
+        VarSetStrCapacity(&watcherTicks, 10000), totalTime := 0
+            for Watcher, Settings in this.Watchers
             {
-                this.Ticks.Folder := this.QPC()
-                loop files Source, "F"
+                ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
+                this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
+                ; displaymap(this._Watcher.Value, A_LineNumber, 1)
+                ; DisplayMap(Settings, A_LineNumber)
+                ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
+                for Source in this._Watcher.Value["Source"]
                 {
-                    this.store_FileInstance() ;this is to store the Loop Files variables into an object
-                    msgbox this.FormatSeconds(DateDiff(A_Now, this.LF.timeModified, "s"))
-                }
 
+                    this.Ticks.Folder := this.QPC()
+                    loop files Source, "F"
+                    {
+
+                        ; this.store_FileInstance() ;this is to store the Loop Files variables into an object
+                        ; msgbox this.FormatSeconds(DateDiff(A_Now, this.LF.timeModified, "s"))
+                        lastIndex := A_Index
+                    }
+                }
+                ticks := this.QPC(this.ticks.Folder)
+                totalTime += ticks
+                watcherTicks .= A_Tab ticks "ms (" lastIndex ")" Watcher "`r`n "
             }
-        }
+        msgbox totalTime "ms `r`n"  watcherTicks 
     }
     store_FileInstance() {
         fileObj := Object()
