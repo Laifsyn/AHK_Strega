@@ -212,7 +212,7 @@ Class TargetFile extends Watchdog_Base {
             For Val in A_TargetValues {
                 if RegExMatch(Val, "r/(.*)/(.*)", &SubPat)
                 {
-                    RegEx.Push(Val)
+                    RegEx.Push(SubPat[1])
                     continue
                 }
                 temp .= val "|"
@@ -348,13 +348,12 @@ Class Strega_Watcher {
     History_CountThreshold := 50
     __New(PathsObj, TargetObj) {
         this.DefineProp("startUp", { Value: A_Now })
+            , this.DefineProp("Count", { Value: { History: 0 } })
             ; , this.DefineProp("Watchers", { Value: PathsObj })
             ; , this.DefineProp("Targets", { Value: TargetObj })
             ; In case I need a pointer to the original Obj. Otherwise this should suffice
             , this.DefineProp("Watchers", { Value: PathsObj.Paths })
             , this.DefineProp("Targets", { Value: TargetObj.Targets })
-            , DllCall("QueryPerformanceFrequency", "Int64*", &freq := 0)
-            , this.freq := freq
             , this.DefineProp("Ticks", { Value: Object() })
 
         return this
@@ -363,18 +362,21 @@ Class Strega_Watcher {
     QPC(Counter := "", Decimals := 2) {
         If Counter = ""
         {
-            DllCall("QueryPerformanceCounter", "Int64*", &Counter := 0)
+            DllCall("QueryPerformanceFrequency", "Int64*", &freq := 0)
+                , this.freq := freq
+                , DllCall("QueryPerformanceCounter", "Int64*", &Counter := 0)
             return Counter
         }
         DllCall("QueryPerformanceCounter", "Int64*", &CounterAfter := 0)
         return Round((CounterAfter - Counter) / this.freq * 1000, Decimals)
     }
 
-    LogFormat(Detail, Result, InfoType, Time := A_Now) => Format("[{1}]({2}){3}",
-        Format("{}.{}", FormatTime(Time, "HH:mm:ss"), A_MSec)
+    LogFormat(Detail, Result, InfoType, Count, Time := A_Now) => Format("[{1}]{4}({2}){3}",
+        Format("{}.{}", FormatTime(Time, "HH:mm:ss"), A_MSec),
         InfoType,
-        ResultInfo := Detail = "" ? Result : Detail " ≡ " Result
-    )
+        ResultInfo := Detail = "" ? Result : Detail " ≡ " Result,
+        !!Count ? Format("[{}]", Count) : ""
+        )
 
     FormatSeconds(Input) {
         Time := 20000101 ;Arbitrary midnight of any date
@@ -387,30 +389,72 @@ Class Strega_Watcher {
         ; DisplayMap(this.Targets, A_LineNumber)
         ; * This will iterate over Paths.json[Paths].Watchers→Settings
         VarSetStrCapacity(&watcherTicks, 10000), totalTime := 0
-            for Watcher, Settings in this.Watchers
+        for Watcher, Settings in this.Watchers
+        {
+
+            ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
+            this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
+                , last_fileIndex := 0, last_sourceIndex := 0
+            ; displaymap(this._Watcher.Value, A_LineNumber, 1)
+            ; DisplayMap(Settings, A_LineNumber)
+            ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
+            for Source in this._Watcher.Value["Source"]
             {
-                ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
-                this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
-                ; displaymap(this._Watcher.Value, A_LineNumber, 1)
-                ; DisplayMap(Settings, A_LineNumber)
-                ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
-                for Source in this._Watcher.Value["Source"]
+
+                this.DefineProp("_loop", { value: { source: Source, source_hasMatch: 0 } }) ; * a way to access the current Source Path I'm iterating
+                    , this.Ticks.Folder := this.QPC()
+                ;   msgbox this._Watcher.KeyName "`r`n" this._loop.source "`r`n" JXON.Dump(this._Watcher.Value["TargetKeys"])
+                loop files this._loop.source, "F"
                 {
+                    this._loop.fileIndex := A_Index
+                        , this.store_FileInstance() ; * this is to store the Loop Files variables into an object
+                        , this.send_File()
 
-                    this.Ticks.Folder := this.QPC()
-                    loop files Source, "F"
-                    {
-
-                        ; this.store_FileInstance() ;this is to store the Loop Files variables into an object
-                        ; msgbox this.FormatSeconds(DateDiff(A_Now, this.LF.timeModified, "s"))
-                        lastIndex := A_Index
-                    }
+                    last_fileIndex += 1
                 }
-                ticks := this.QPC(this.ticks.Folder)
-                totalTime += ticks
-                watcherTicks .= A_Tab ticks "ms (" lastIndex ")" Watcher "`r`n "
+                this.History:="`r`n" ; Logging Related
+                ,last_sourceIndex += 1
             }
-        msgbox totalTime "ms `r`n"  watcherTicks 
+            ticks := this.QPC(this.ticks.Folder)
+                , totalTime += ticks
+                , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", last_sourceIndex, last_fileIndex, Watcher)
+                , last_fileIndex := 0, last_sourceIndex := 0
+        }
+        SetListVars(this.History, 1)
+        msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
+    }
+    send_File() {
+        ; msgbox this._loop.source " `r`n" this.LF.fullName
+        for TargetKey in this._Watcher.Value["TargetKeys"]
+        {
+
+            switch this.Targets[TargetKey].type, 0 {
+                case "mixed":
+                    fileName := this.LF.fullName
+                case "Filetype":
+                    fileName := this.LF.ext
+                case "Keyword":
+                    fileName := this.LF.name
+            }
+            match := 0
+            For regKey in this.Targets[TargetKey].Targets
+                match += RegExMatch(fileName, regKey) ? 1 : 0
+            if match
+            {
+                If !this._loop.source_hasMatch
+                {
+                    this.History["", "INFO", 0] := this._loop.source " " this.Targets[TargetKey].type "→RegExs:" JXON.Dump(this.Targets[TargetKey].Targets) "`r`n"
+                    this._loop.source_hasMatch := 1
+                }
+                this.History := this._loop.fileIndex "_" this.LF.fullName Format("({})", match) "`r`n" ;A_Tab this.Targets[TargetKey].type  A_Tab JXON.Dump(this.Targets[TargetKey].Targets, 1) "`r`n"
+
+            }
+            continue
+
+            msgbox UDF.getPropsList(this.Targets[TargetKey]) "`r`n" JXON.Dump(this.Targets[TargetKey].Targets, 1)
+            DisplayMap(this.Targets[TargetKey], A_LineNumber)
+
+        }
     }
     store_FileInstance() {
         fileObj := Object()
@@ -438,12 +482,17 @@ Class Strega_Watcher {
     }
     History[Detail := "", InfoType := "LOG", CountStep := 1, Dump := 0] {
         set {
-            Static Count := 0
-            Count += CountStep
-                , this._History := this.History this.LogFormat(Detail, Value, InfoType "[" Count "]")
+            if Value = "`r`n"
+            {
+                this._History := this.History "`r`n"
+                return
+            }
+            this.Count.History += CountStep
+                , this._History := this.History this.LogFormat(Detail, Value, InfoType, this.Count.History)
 
-            if !Dump and (Mod(Count, 50) and Count > 0)
-                Return
+            if !Dump and (Mod(this.Count.History, 50) and this.Count.History > 0) or this.Count.History = 0
+                return
+            msgbox "dumping " . Mod(this.Count.History, 50) . " = " . (this.Count.History > 0) "`r`n" (!Dump and (Mod(this.Count.History, 50) and this.Count.History != 0))
             this.Dump(this.History),
                 this._History := ""
         }
