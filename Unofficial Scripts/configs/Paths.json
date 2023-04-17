@@ -9,7 +9,7 @@
 			"isPath" : true,
 			"TargetKeys" : ["Calculo","Fisica","Quimica", "2"],
 			"Description" : "Path to Watch over",
-			"TimeUp": "15645485215",
+			"TimeUp": "8d18h",
 			"Age_asCountdown": 1
 			},
 		"Watch_2" : {

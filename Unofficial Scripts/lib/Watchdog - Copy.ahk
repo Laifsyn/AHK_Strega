@@ -146,7 +146,7 @@ Class TargetFile extends Watchdog_Base {
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
-            , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
+            , this.Targets := TargetFile.Configs(this["Targets"], this) ; I will be able to keep an intact this["Targets"]
     }
 
     Class Configs extends Watchdog_Base {
@@ -246,7 +246,7 @@ Class WatchFile Extends Watchdog_Base {
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
             , WatcherConfigs := this["WatcherConfigs"]
-            , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; This will leave an un-edited version of this["Paths"]
+            , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; I will be able to keep an intact this["Paths"]
 
         ; For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
 
@@ -345,7 +345,7 @@ Class WatchFile Extends Watchdog_Base {
 }
 
 Class Strega_Watcher {
-    History_CountThreshold := 50
+    History_CountThreshold := 500
     __New(PathsObj, TargetObj) {
         this.DefineProp("startUp", { Value: A_Now })
             , this.DefineProp("Count", { Value: { History: 0 } })
@@ -401,19 +401,32 @@ Class Strega_Watcher {
             for Source in this._Watcher.Value["Source"]
             {
 
-                this.DefineProp("_loop", { value: { source: Source, source_hasMatch: 0 } }) ; * a way to access the current Source Path I'm iterating
+                this.DefineProp("_loop", { value: { source: Source,
+                    sourceIndex: A_Index,
+                    conflicts: "",
+                    fileIndex: "",
+                    matchedFiles: 0,
+                    matchedFiles_First: ""
+                } }) ; * a way to access the current Source Path I'm iterating
+
+                this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
+                    sourceIndex: "This leaves access to the current Source Index ",
+                    conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
+                    fileIndex: "Access the current Index of the loop file",
+                    matchedFiles: "Access the current amount of matched files in the iteration",
+                    matchedFiles_First: "This will store the first match of the file"
+                } }) ; Descriptions of this._loop's properties
                     , this.Ticks.Folder := this.QPC()
-                ;   msgbox this._Watcher.KeyName "`r`n" this._loop.source "`r`n" JXON.Dump(this._Watcher.Value["TargetKeys"])
                 loop files this._loop.source, "F"
                 {
-                    this._loop.fileIndex := A_Index
+                    this._loop.fileIndex := A_Index ; * So I can get access to the current file index that's in iteration
                         , this.store_FileInstance() ; * this is to store the Loop Files variables into an object
-                        , this.send_File()
-
+                    If this.do_fileMatch()
+                        this.proceed_Send()
                     last_fileIndex += 1
                 }
-                this.History:="`r`n" ; Logging Related
-                ,last_sourceIndex += 1
+                this.History := "`r`n" ; Logging Related - Adds a blank line to separate a Source Iteration
+                    , last_sourceIndex += 1
             }
             ticks := this.QPC(this.ticks.Folder)
                 , totalTime += ticks
@@ -423,11 +436,19 @@ Class Strega_Watcher {
         SetListVars(this.History, 1)
         msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
     }
-    send_File() {
+    do_fileMatch() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
+        msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
+        If this._Watcher.Value["Age_asCountdown"]
+            If (this._loop.fileAge := this.get_StoredAge()) <= this._Watcher.Value["TimeUp"] ; * Returns Age in seconds.
+                return 0
+        ;* Because we're evaluating if it should have a cooldown, if
+        msgbox UDF.getPropsList(this._Watcher)
+        msgbox UDF.getPropsList(this.LF)
+        DisplayMap(this._Watcher.Value, A_LineNumber)
+        this._loop.conflicts := [] ;* This will keep tracks cases when there're more than a single target match
         for TargetKey in this._Watcher.Value["TargetKeys"]
         {
-
             switch this.Targets[TargetKey].type, 0 {
                 case "mixed":
                     fileName := this.LF.fullName
@@ -438,24 +459,35 @@ Class Strega_Watcher {
             }
             match := 0
             For regKey in this.Targets[TargetKey].Targets
-                match += RegExMatch(fileName, regKey) ? 1 : 0
+                match += !!RegExMatch(fileName, regKey)  ; * To know how many regex keys matches the filename
             if match
             {
-                If !this._loop.source_hasMatch
-                {
-                    this.History["", "INFO", 0] := this._loop.source " " this.Targets[TargetKey].type "→RegExs:" JXON.Dump(this.Targets[TargetKey].Targets) "`r`n"
-                    this._loop.source_hasMatch := 1
+                this._loop.conflicts.Push(TargetKey)
+                if (this._loop.conflicts.Length = 1)
+                    this._loop.matchedFiles_First := this.Targets[TargetKey]["Target"]
+                If !this._loop.matchedFiles ; * This is to discriminate between the first match and subsequent ones.
+                    ; * It's purpose is to add a header to the list that will identify the logging info
+                    this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
+                        this._loop.source, this.Targets[TargetKey].type, JXON.Dump(this.Targets[TargetKey].Targets), A_Tab
+                    )
+                if this._loop.conflicts.Length = 1 {
+                    this.History := Format("[{1}]{2}({3})`r`n", this._loop.fileIndex, this.LF.fullName, match) ;A_Tab this.Targets[TargetKey].type  A_Tab JXON.Dump(this.Targets[TargetKey].Targets, 1) "`r`n"
+                    ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
                 }
-                this.History := this._loop.fileIndex "_" this.LF.fullName Format("({})", match) "`r`n" ;A_Tab this.Targets[TargetKey].type  A_Tab JXON.Dump(this.Targets[TargetKey].Targets, 1) "`r`n"
-
             }
-            continue
-
-            msgbox UDF.getPropsList(this.Targets[TargetKey]) "`r`n" JXON.Dump(this.Targets[TargetKey].Targets, 1)
-            DisplayMap(this.Targets[TargetKey], A_LineNumber)
-
         }
+        if !!this._loop.conflicts.Length
+            this._loop.matchedFiles += 1
+        return !!this._loop.conflicts.Length
     }
+    get_StoredAge() {
+
+        return
+    }
+    proceed_Send() {
+
+    }
+
     store_FileInstance() {
         fileObj := Object()
             , fileObj.fullName := A_LoopFileName, fileObj.ext := A_LoopFileExt
@@ -466,7 +498,7 @@ Class Strega_Watcher {
         ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
         this.DefineProp("LF", { value: fileObj })
     }
-    Dump(content) {
+    Dump(content, file := A_ScriptDir "\logs.txt", Encryption := "UTF-8") { ; Dumps history into the file
 
     }
     procedureIndex {
@@ -488,11 +520,11 @@ Class Strega_Watcher {
                 return
             }
             this.Count.History += CountStep
-                , this._History := this.History this.LogFormat(Detail, Value, InfoType, this.Count.History)
+                , this._History := this.History this.LogFormat(Detail, Value, InfoType, !!CountStep ? this.Count.History : 0)
 
-            if !Dump and (Mod(this.Count.History, 50) and this.Count.History > 0) or this.Count.History = 0
+            if (!Dump and (Mod(this.Count.History, this.History_CountThreshold) and this.Count.History >= 0)) or this.Count.History = 0
                 return
-            msgbox "dumping " . Mod(this.Count.History, 50) . " = " . (this.Count.History > 0) "`r`n" (!Dump and (Mod(this.Count.History, 50) and this.Count.History != 0))
+            msgbox "dumping " . Format(this.Count.History "){1}={2}`r`n{3}", Mod(this.Count.History, this.History_CountThreshold), this.Count.History >= 0, !Dump and (Mod(this.Count.History, 50) and this.Count.History >= 0))
             this.Dump(this.History),
                 this._History := ""
         }
@@ -505,6 +537,31 @@ Class Strega_Watcher {
                 )
 
         }
+    }
+
+}
+
+Class StoredTimestamp extends Watchdog_Base {
+    __New(Path, type := "Text", encoding := this._encoding) {
+        this.DefineProp("__path", { Value: StrLen(path) })
+            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+            , JsonMap := this.transformString(Path, Type, encoding)
+            , this.mergeMap(this, JsonMap)
+        ; , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
+    }
+    __Item[keyName] {
+        get {
+            if this.Has(keyName)
+                return super[keyName]
+            else
+                this[KeyName] := StoredTimestamp.Path()
+        }
+        set {
+            super[keyName] := Value
+        }
+    }
+    Class Path extends Map{
+        
     }
 }
 

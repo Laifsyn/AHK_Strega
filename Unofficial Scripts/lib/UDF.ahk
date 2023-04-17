@@ -3,12 +3,12 @@
 
 ; Functions
 
-SetListVars(Text, DoWaitMsg := 0) {
+SetListVars(Text, DoWaitMsg := 0, msgboxText := "Waiting.....") {
 	ListVars
 	WinWaitActive "ahk_class AutoHotkey"
 	ControlSetText Text, "Edit1"
 	if DoWaitMsg
-		Msgbox "Waiting....."
+		Msgbox msgboxText
 }
 
 DisplayMap(InputObject, LineNumber := "", Padding := 4) {
@@ -22,10 +22,27 @@ Class UDF {
 		Format("{1}: {2}.`n`nFile:`t{3}`nLine:`t{4}`nWhat:`t{5}`nStack:`n{6}"
 			, type(errObject), errObject.Message, errObject.File, errObject.Line, errObject.What, errObject.Stack)
 
-	Static getPropsList(inputObject, LineNumber := "") {
+	Static getPropsList(inputObject, LineNumber := "", maxStrLen := 50) {
 		Text := ""
 		for prop, _ in inputObject.OwnProps()
-			Text .= prop (IsObject(_) ? Format(" : [{1:#x}] {2}", ObjPtr(_), Type(_)) : " : " SubStr(_, 1, 50)) "`r`n"
+		{
+			(IsObject(_) ? Format(" : [{1:#x}] {2}", ObjPtr(_), Type(_)) : " : " SubStr(_, 1, 50))
+			If IsObject(_)
+			{
+				switch ObjType := Type(_), 0 {
+					case "Array":
+						type_Size := Format("({})", _.Length)
+					case "Map":
+						type_Size := Format("({})", _.Count)
+					default:
+						type_Size := ""
+				}
+				Value := Format(" : [{1:#x}] {2}", ObjPtr(_), ObjType type_Size)
+			}
+			else
+				Value := ((ValLen := strlen(_)) >= maxStrLen ? Format("{}...({})", SubStr(_, 1, StrOffset:=maxStrLen - 10), ValLen-StrOffset) : _)
+			Text .= Format("{} : {}`r`n", prop, Value)
+		}
 		return (LineNumber = "" ? "" : LineNumber "`r`n") Text
 	}
 
