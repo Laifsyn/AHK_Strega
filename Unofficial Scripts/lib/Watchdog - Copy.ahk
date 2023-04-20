@@ -139,6 +139,7 @@ Class TargetFile extends Watchdog_Base {
             , JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
             , this.Targets := TargetFile.Configs(this["Targets"], this) ; I will be able to keep an intact this["Targets"]
+        return this
     }
 
     Class Configs extends Watchdog_Base {
@@ -239,7 +240,7 @@ Class WatchFile Extends Watchdog_Base {
             , this.mergeMap(this, JsonMap)
             , WatcherConfigs := this["WatcherConfigs"]
             , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; I will be able to keep an intact this["Paths"]
-
+        return this
         ; For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
 
         ;     Temp := WatchFile.Configs(A_Settings, Watcher, this)
@@ -535,57 +536,59 @@ Class Strega_Watcher {
 
 
 Class StoredTimestamp extends Watchdog_Base {
-    __New(Path, type := "Text", encoding := this._encoding) {
+    __New(Path := "", type := "Text", encoding := this._encoding) {
+        if Path := ""
+            return this
         this.DefineProp("__path", { Value: StrLen(path) })
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
-            , this.mergeMap(this, JsonMap)
-        ; , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
+        for k_Path, v_Files in JsonMap
+            for k_Files, v_storedTimeStamp in v_Files
+                this[k_Path][k_Files] := v_storedTimeStamp
+        return this
     }
     __Item[keyName] {
         get {
+            keyName := Trim(keyName, " \")
             if this.Has(keyName)
                 return super[keyName]
-            newInst := StoredTimestamp.Path(this)
-                , newInst.DefineProp("__pathName", { Value: KeyName })
+            newInst := StoredTimestamp.File(this) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
+                , newInst.DefineProp("__pathName", { Value: KeyName }) ; * Defines a __pathName Property so I can access the path keyName
             return this[KeyName] := newInst
-        } ;del
-    } ;del
-
-    ; { Inner Classes
-    Class Path extends Map {
-        __New(parent, params*) {
-            this.__fileLastModified := parent.__fileLastModified
-            ; super.__New(params*) ; Idk if I might need this
         }
-        __Item[keyName] {
-            get {
-                if this.Has(keyName)
-                    return super[keyName]
-                newInst := StoredTimestamp.File(this)
-                    , newInst.DefineProp("__fileName", { Value: KeyName })
-                return this[KeyName] := newInst
-            }  ;del
-        } ;del
+        set {
+            if !(Value is StoredTimestamp.File)
+                throw ValueError(Format("{}[{}] expects {}, but got {}!", Type(this), keyName, Type(this) ".File", Type(Value)))
+            keyName := Trim(keyName, " \")
+            Value.__pathName := keyName
+            super[keyName] := Value
+        }
     }
+    Dump() {
+
+    }
+    ; { Inner Classes
+
     Class File extends Map {
-        __New(parent, params*) {
+
+        __New(parent) {
             this.__fileLastModified := parent.__fileLastModified
-            this.__pathName := parent.__pathName
-        } ;del
+            return this
+        }
+
         __Item[keyName] {
             get {
                 if !this.Has(keyName)
                     this[KeyName] := A_Now
                 return super[keyName]
-            } ;del
+            }
             set {
                 if !IsNumber(Value)
-                    throw ValueError("Expects a number, but got " Type(Value), , Format("[{}][{}]", this.__pathName, this.__fileName))
+                    throw ValueError(Format("{}[{}] Expects a Number, but got " Type(Value), Type(this), keyName), , Format("[{}][{}]", this.__pathName, keyName)) ; Test with StoredTimestamp["C:\???"]["myfile.ahk"] := {}
                 Value := { Value: Value, stored: this.stored, lastModified: this.__fileLastModified }
                 super[keyName] := Value
-            } ;del
-        } ;del
-    } ;del
-    ; }
-} ;del
+            }
+        }
+    }
+
+}
