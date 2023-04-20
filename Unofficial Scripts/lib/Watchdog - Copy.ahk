@@ -553,19 +553,29 @@ Class StoredTimestamp extends Watchdog_Base {
             if this.Has(keyName)
                 return super[keyName]
             newInst := StoredTimestamp.File(this) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
-                , newInst.DefineProp("__pathName", { Value: KeyName }) ; * Defines a __pathName Property so I can access the path keyName
+                , newInst.DefineProp("_pathName", { Value: KeyName }) ; * Defines a _pathName Property so I can access the path keyName
             return this[KeyName] := newInst
         }
         set {
             if !(Value is StoredTimestamp.File)
                 throw ValueError(Format("{}[{}] expects {}, but got {}!", Type(this), keyName, Type(this) ".File", Type(Value)))
             keyName := Trim(keyName, " \")
-            Value.__pathName := keyName
+            Value._pathName := keyName
             super[keyName] := Value
         }
     }
-    Dump() {
 
+    Dump(inputMap, path := "") {
+        tempMap := Map()
+        for k_Path, v_Files in inputMap
+            for k_Files, v_other in v_Files
+                tempMap[k_Path] := Map(k_Files, tempMap[k_Path][k_Files].Value)
+        if (path = "")
+            path := this.__path
+        if !FileExist(path)
+            throw ValueError(Format("There's no valid path to dump values in {}", Type(this)), , path)
+        DisplayMap(tempMap, A_LineNumber, 1)
+        FileOpen(this.__path, 0x1, this._encoding).Write(JXON.dump(tempMap, 1))
     }
     ; { Inner Classes
 
@@ -584,8 +594,10 @@ Class StoredTimestamp extends Watchdog_Base {
             }
             set {
                 if !IsNumber(Value)
-                    throw ValueError(Format("{}[{}] Expects a Number, but got " Type(Value), Type(this), keyName), , Format("[{}][{}]", this.__pathName, keyName)) ; Test with StoredTimestamp["C:\???"]["myfile.ahk"] := {}
+                    throw ValueError(Format("{}[{}] Expects a Number, but got " Type(Value), Type(this), keyName), , Format("[{}][{}]", this._pathName, keyName)) ; Test with StoredTimestamp["C:\???"]["myfile.ahk"] := {}
                 Value := { Value: Value, stored: this.stored, lastModified: this.__fileLastModified }
+                ; * Value Props
+                ; * Value stores the digital timestamp. It will keep the latest timestamp in memory
                 super[keyName] := Value
             }
         }
