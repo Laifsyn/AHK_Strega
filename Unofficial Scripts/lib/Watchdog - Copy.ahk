@@ -339,7 +339,7 @@ Class WatchFile Extends Watchdog_Base {
 
 Class Strega_Watcher {
     History_CountThreshold := 500
-    __New(PathsObj, TargetObj) {
+    __New(PathsObj, TargetObj, StoredTimestamp := "") {
         this.DefineProp("startUp", { Value: A_Now })
             , this.DefineProp("Count", { Value: { History: 0 } })
             ; , this.DefineProp("Watchers", { Value: PathsObj })
@@ -347,6 +347,7 @@ Class Strega_Watcher {
             ; In case I need a pointer to the original Obj. Otherwise this should suffice
             , this.DefineProp("Watchers", { Value: PathsObj.Paths })
             , this.DefineProp("Targets", { Value: TargetObj.Targets })
+            , this.DefineProp("storedTimestamp", { Value: StoredTimestamp })
             , this.DefineProp("Ticks", { Value: Object() })
 
         return this
@@ -414,8 +415,8 @@ Class Strega_Watcher {
                 {
                     this._loop.fileIndex := A_Index ; * So I can get access to the current file index that's in iteration
                         , this.store_FileInstance() ; * this is to store the Loop Files variables into an object
-                    If this.do_fileMatch()
-                        this.proceed_Send()
+                    If this.fileMatch_Logic()
+                        this.send_File()
                     last_fileIndex += 1
                 }
                 this.History := "`r`n" ; Logging Related - Adds a blank line to separate a Source Iteration
@@ -429,10 +430,10 @@ Class Strega_Watcher {
         SetListVars(this.History, 1)
         msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
     }
-    do_fileMatch() { ; * Tells whether the file matches the predefined conditions
+    fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
         msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
-        If this._Watcher.Value["Age_asCountdown"]
+        If this._Watcher.Value["Age_asCountdown"] and this.hasTimestamp()
             If (this._loop.fileAge := this.get_StoredAge()) <= this._Watcher.Value["TimeUp"] ; * Returns Age in seconds.
                 return 0
         ;* Because we're evaluating if it should have a cooldown, if
@@ -473,18 +474,23 @@ Class Strega_Watcher {
             this._loop.matchedFiles += 1
         return !!this._loop.conflicts.Length
     }
+    hasTimestamp() => this.storedTimestamp.Has(this.LF.path) And this.storedTimestamp[this.__loop.source].Has(this.LF.fullName)
+
     get_StoredAge() {
 
         return
     }
-    proceed_Send() {
+    process_StoredAge() {
+    }
+
+    send_File() {
 
     }
 
     store_FileInstance() {
         fileObj := Object()
             , fileObj.fullName := A_LoopFileName, fileObj.ext := A_LoopFileExt
-            , fileObj.name := RegExReplace(fileObj.fullName, "\..*$", "")
+            , fileObj.name := RegExReplace(fileObj.fullName, "\.[^\.]+$", "")
             , fileObj.fullPath := A_LoopFileFullPath, fileObj.path := A_LoopFileDir
             ; , fileObj.timeAccess := A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
             , fileObj.timeModified := A_LoopFileTimeModified
@@ -544,7 +550,7 @@ Class StoredTimestamp extends Watchdog_Base {
             , JsonMap := this.transformString(Path, Type, encoding)
         for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
-                this[k_Path][k_Files] := v_storedTimeStamp
+                this[k_Path][k_Files] := A_Now, this[k_Path][k_Files].DefineProp("stored")
         return this
     }
     __Item[keyName] {
@@ -552,8 +558,7 @@ Class StoredTimestamp extends Watchdog_Base {
             keyName := Trim(keyName, " \")
             if this.Has(keyName)
                 return super[keyName]
-            newInst := StoredTimestamp.File(this) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
-                , newInst.DefineProp("_pathName", { Value: KeyName }) ; * Defines a _pathName Property so I can access the path keyName
+            newInst := StoredTimestamp.File(this).DefineProp("_pathName", { Value: KeyName }) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
             return this[KeyName] := newInst
         }
         set {
@@ -569,12 +574,13 @@ Class StoredTimestamp extends Watchdog_Base {
         tempMap := Map()
         for k_Path, v_Files in inputMap
             for k_Files, v_other in v_Files
-                tempMap[k_Path] := Map(k_Files, tempMap[k_Path][k_Files].Value)
+                tempMap.Set(k_path, Map(k_Files, inputMap[k_Path][k_Files].Value))
         if (path = "")
             path := this.__path
-        if !FileExist(path)
+        if !FileExist(path) {
+            DisplayMap(tempMap, A_LineNumber, 1)
             throw ValueError(Format("There's no valid path to dump values in {}", Type(this)), , path)
-        DisplayMap(tempMap, A_LineNumber, 1)
+        } else DisplayMap(tempMap, A_LineNumber, 1)
         FileOpen(this.__path, 0x1, this._encoding).Write(JXON.dump(tempMap, 1))
     }
     ; { Inner Classes
@@ -590,12 +596,15 @@ Class StoredTimestamp extends Watchdog_Base {
             get {
                 if !this.Has(keyName)
                     this[KeyName] := A_Now
+                if !super[keyName].HasProp("exists") ; * Super to avoid infinite recursion
+                    super[keyName].DefineProp("exists", { Value: 0 })
                 return super[keyName]
             }
             set {
                 if !IsNumber(Value)
                     throw ValueError(Format("{}[{}] Expects a Number, but got " Type(Value), Type(this), keyName), , Format("[{}][{}]", this._pathName, keyName)) ; Test with StoredTimestamp["C:\???"]["myfile.ahk"] := {}
-                Value := { Value: Value, stored: this.stored, lastModified: this.__fileLastModified }
+                Value := { Value: Value, lastModified: this.__fileLastModified }
+
                 ; * Value Props
                 ; * Value stores the digital timestamp. It will keep the latest timestamp in memory
                 super[keyName] := Value
