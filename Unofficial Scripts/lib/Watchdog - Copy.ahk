@@ -433,14 +433,14 @@ Class Strega_Watcher {
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
         msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
-        If this._Watcher.Value["Age_asCountdown"] and this.hasTimestamp()
-            If (this._loop.fileAge := this.get_StoredAge()) <= this._Watcher.Value["TimeUp"] ; * Returns Age in seconds.
+        If this._Watcher.Value["Age_asCountdown"] and this.hasTimestamp() ; * If there's a registered timestamp, then it ought to have timestamp to retrieve
+            If DateDiff(A_Now, this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file has a registered timestamp and it's below the TimeUp it will skip
                 return 0
         ;* Because we're evaluating if it should have a cooldown, if
         msgbox UDF.getPropsList(this._Watcher)
         msgbox UDF.getPropsList(this.LF)
         DisplayMap(this._Watcher.Value, A_LineNumber)
-        this._loop.conflicts := [] ;* This will keep tracks cases when there're more than a single target match
+        this._loop.conflicts := [] ; * This will keep tracks cases when there're more than a single target match
         for TargetKey in this._Watcher.Value["TargetKeys"]
         {
             switch this.Targets[TargetKey].type, 0 {
@@ -457,15 +457,21 @@ Class Strega_Watcher {
             if match
             {
                 this._loop.conflicts.Push(TargetKey)
-                if (this._loop.conflicts.Length = 1)
-                    this._loop.matchedFiles_First := this.Targets[TargetKey]["Target"]
+                if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first match
+                    this._loop.matchedFiles_First := this.Targets[TargetKey]["Target"],
+                    this.storedTimestamp[this.__loop.source][this.LF.fullName] := A_Now
+                ; * so If I'm not wrong, if I want to clean up unused Timestamps, I only have to compare if both StoreTimeStamp[][].Value == StoreTimeStamp[][].lastModified to know it didn't trigger
+                ; * This method should let me know that the file no longer exists, and there's no use to keep it in system... Hopefully
+
+
+                ; * Dump this below to this.send_File() to do the logging there instead
                 If !this._loop.matchedFiles ; * This is to discriminate between the first match and subsequent ones.
                     ; * It's purpose is to add a header to the list that will identify the logging info
                     this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
                         this._loop.source, this.Targets[TargetKey].type, JXON.Dump(this.Targets[TargetKey].Targets), A_Tab
                     )
                 if this._loop.conflicts.Length = 1 {
-                    this.History := Format("[{1}]{2}({3})`r`n", this._loop.fileIndex, this.LF.fullName, match) ;A_Tab this.Targets[TargetKey].type  A_Tab JXON.Dump(this.Targets[TargetKey].Targets, 1) "`r`n"
+                    this.History := Format("[{1}]{2}({3})`r`n", this._loop.fileIndex, this.LF.fullName, match)
                     ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
                 }
             }
@@ -476,10 +482,8 @@ Class Strega_Watcher {
     }
     hasTimestamp() => this.storedTimestamp.Has(this.LF.path) And this.storedTimestamp[this.__loop.source].Has(this.LF.fullName)
 
-    get_StoredAge() {
+    get_StoredAge() => this.storedTimestamp[this.__loop.source][this.LF.fullName].Value
 
-        return
-    }
     process_StoredAge() {
     }
 
@@ -544,13 +548,13 @@ Class Strega_Watcher {
 Class StoredTimestamp extends Watchdog_Base {
     __New(Path := "", type := "Text", encoding := this._encoding) {
         if Path := ""
-            return this
+            throw ValueError("No path defined!", , type(this))
         this.DefineProp("__path", { Value: StrLen(path) })
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
         for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
-                this[k_Path][k_Files] := A_Now, this[k_Path][k_Files].DefineProp("stored")
+                this[k_Path] := StoredTimestamp.File(k_Files, { Value: v_storedTimeStamp, stored: v_storedTimeStamp, lastModified: this.__fileLastModified })
         return this
     }
     __Item[keyName] {
@@ -558,7 +562,7 @@ Class StoredTimestamp extends Watchdog_Base {
             keyName := Trim(keyName, " \")
             if this.Has(keyName)
                 return super[keyName]
-            newInst := StoredTimestamp.File(this).DefineProp("_pathName", { Value: KeyName }) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
+            newInst := StoredTimestamp.File().DefineProp("_pathName", { Value: KeyName }) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
             return this[KeyName] := newInst
         }
         set {
@@ -587,27 +591,18 @@ Class StoredTimestamp extends Watchdog_Base {
 
     Class File extends Map {
 
-        __New(parent) {
-            this.__fileLastModified := parent.__fileLastModified
-            return this
-        }
-
         __Item[keyName] {
             get {
                 if !this.Has(keyName)
-                    this[KeyName] := A_Now
-                if !super[keyName].HasProp("exists") ; * Super to avoid infinite recursion
-                    super[keyName].DefineProp("exists", { Value: 0 })
+                    super[KeyName] := { Value: A_Now }
                 return super[keyName]
             }
             set {
                 if !IsNumber(Value)
                     throw ValueError(Format("{}[{}] Expects a Number, but got " Type(Value), Type(this), keyName), , Format("[{}][{}]", this._pathName, keyName)) ; Test with StoredTimestamp["C:\???"]["myfile.ahk"] := {}
-                Value := { Value: Value, lastModified: this.__fileLastModified }
-
-                ; * Value Props
-                ; * Value stores the digital timestamp. It will keep the latest timestamp in memory
-                super[keyName] := Value
+                this[keyName].Value := Value
+                ; * Value stores the digital timestamp. It means that the latest timestamp is here
+                super[keyName] := this[keyName]
             }
         }
     }
