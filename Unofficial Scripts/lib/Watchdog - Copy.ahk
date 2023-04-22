@@ -299,7 +299,9 @@ Class WatchFile Extends Watchdog_Base {
                         Val := Array()
                         , Value := Value is Array ? Value : Array(Value)
                         For _, v in Value {
-                            if InStr(v, ";", , (-StrLen(v)))
+                            if RegExMatch(v, "[A-Z]:\\Program Files")
+                                msgboxResult:=MsgBox("You're trying to watch a System file, wanna discard this entry? `r`n" v ,,0x4)
+                            if InStr(v, ";", , (-StrLen(v))) or msgboxResult="Yes"s
                                 continue
                             v := this.process_Keywords(v)
                                 , oldv := v
@@ -492,10 +494,11 @@ Class Strega_Watcher {
     }
 
     store_FileInstance() {
+        SplitPath A_LoopFileFullPath , &FullName, &Path, &Ext, &name
         fileObj := Object()
-            , fileObj.fullName := A_LoopFileName, fileObj.ext := A_LoopFileExt
-            , fileObj.name := RegExReplace(fileObj.fullName, "\.[^\.]+$", "")
-            , fileObj.fullPath := A_LoopFileFullPath, fileObj.path := A_LoopFileDir
+            , fileObj.fullName := FullName, fileObj.ext := Ext
+            , fileObj.name := name
+            , fileObj.fullPath := A_LoopFileFullPath, fileObj.path := Path
             ; , fileObj.timeAccess := A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
             , fileObj.timeModified := A_LoopFileTimeModified
         ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
@@ -543,7 +546,6 @@ Class Strega_Watcher {
     }
 
 }
-
 
 Class StoredTimestamp extends Watchdog_Base {
     __New(Path := "", type := "Text", encoding := this._encoding) {
