@@ -300,8 +300,8 @@ Class WatchFile Extends Watchdog_Base {
                         , Value := Value is Array ? Value : Array(Value)
                         For _, v in Value {
                             if RegExMatch(v, "[A-Z]:\\Program Files")
-                                msgboxResult:=MsgBox("You're trying to watch a System file, wanna discard this entry? `r`n" v ,,0x4)
-                            if InStr(v, ";", , (-StrLen(v))) or msgboxResult="Yes"s
+                                msgboxResult := MsgBox("You're trying to watch a System file, wanna discard this entry? `r`n" v, , 0x4)
+                            if InStr(v, ";", , (-StrLen(v))) or msgboxResult = "Yes"
                                 continue
                             v := this.process_Keywords(v)
                                 , oldv := v
@@ -402,7 +402,7 @@ Class Strega_Watcher {
                     conflicts: "",
                     fileIndex: "",
                     matchedFiles: 0,
-                    matchedFiles_First: ""
+                    matched_firstTargetKey: ""
                 } }) ; * a way to access the current Source Path I'm iterating
 
                 this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
@@ -410,7 +410,7 @@ Class Strega_Watcher {
                     conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
                     fileIndex: "Access the current Index of the loop file",
                     matchedFiles: "Access the current amount of matched files in the iteration",
-                    matchedFiles_First: "This will store the first match of the file"
+                    matched_firstTargetKey: "This will store the first target match of the file"
                 } }) ; Descriptions of this._loop's properties
                     , this.Ticks.Folder := this.QPC()
                 loop files this._loop.source, "F"
@@ -435,12 +435,13 @@ Class Strega_Watcher {
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
         msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
-        If this._Watcher.Value["Age_asCountdown"] and this.hasTimestamp() ; * If there's a registered timestamp, then it ought to have timestamp to retrieve
-            If DateDiff(A_Now, this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file has a registered timestamp and it's below the TimeUp it will skip
+        If this._Watcher.Value["Age_asCountdown"] and (hasTimestamp := this.hasTimestamp())
+        ; * If hasTimestamp registers as set, we can then know that we're working with a countdown, and that the timestamp has to be created.
+        ; * If it's set, we just update the digital timestamp.
+            If DateDiff(A_Now, this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file has a registered timestamp and it's below the TimeUp it will skip the file
                 return 0
-        ;* Because we're evaluating if it should have a cooldown, if
-        msgbox UDF.getPropsList(this._Watcher)
-        msgbox UDF.getPropsList(this.LF)
+        msgbox UDF.getPropsList(this._Watcher, A_LineNumber)
+        msgbox UDF.getPropsList(this.LF, A_LineNumber)
         DisplayMap(this._Watcher.Value, A_LineNumber)
         this._loop.conflicts := [] ; * This will keep tracks cases when there're more than a single target match
         for TargetKey in this._Watcher.Value["TargetKeys"]
@@ -460,7 +461,7 @@ Class Strega_Watcher {
             {
                 this._loop.conflicts.Push(TargetKey)
                 if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first match
-                    this._loop.matchedFiles_First := this.Targets[TargetKey]["Target"],
+                    this._loop.matched_firstTargetKey := this.Targets[TargetKey]["Target"],
                     this.storedTimestamp[this.__loop.source][this.LF.fullName] := A_Now
                 ; * so If I'm not wrong, if I want to clean up unused Timestamps, I only have to compare if both StoreTimeStamp[][].Value == StoreTimeStamp[][].lastModified to know it didn't trigger
                 ; * This method should let me know that the file no longer exists, and there's no use to keep it in system... Hopefully
@@ -494,7 +495,7 @@ Class Strega_Watcher {
     }
 
     store_FileInstance() {
-        SplitPath A_LoopFileFullPath , &FullName, &Path, &Ext, &name
+        SplitPath A_LoopFileFullPath, &FullName, &Path, &Ext, &name
         fileObj := Object()
             , fileObj.fullName := FullName, fileObj.ext := Ext
             , fileObj.name := name
@@ -556,7 +557,11 @@ Class StoredTimestamp extends Watchdog_Base {
             , JsonMap := this.transformString(Path, Type, encoding)
         for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
-                this[k_Path] := StoredTimestamp.File(k_Files, { Value: v_storedTimeStamp, stored: v_storedTimeStamp, lastModified: this.__fileLastModified })
+                this[k_Path] := StoredTimestamp.File(k_Files, {
+                    Value: A_Now,
+                    stored: v_storedTimeStamp,
+                    lastModified: this.__fileLastModified
+                })
         return this
     }
     __Item[keyName] {
