@@ -49,6 +49,8 @@ class Watchdog_Base extends Map {
             InstRef[k] := v
     }
 
+    process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
+
     process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
         While (Input ~= "i)<.*>")
         {
@@ -110,7 +112,6 @@ class Watchdog_Base extends Map {
             , Input := this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
         return Input
     }
-    process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
 
     renameKey(baseObject, OldKey, NewKey) {
         baseObject[NewKey] := baseObject[OldKey]
@@ -123,7 +124,7 @@ class Watchdog_Base extends Map {
                 , Path.Close()
         else if Type = "File"
             JsonString := fileread(Path, encoding)
-                , this.DefineProp("__path", { Value: Path })
+                , this.DefineProp("__path", { Value: Path }) ; It means that this.__path stores the string path that was used to retrieve the file.
         else if Type = "Text"
             JsonString := Path
         else
@@ -301,7 +302,7 @@ Class WatchFile Extends Watchdog_Base {
                         For _, v in Value {
                             if RegExMatch(v, "[A-Z]:\\Program Files")
                                 msgboxResult := MsgBox("You're trying to watch a System file, wanna discard this entry? `r`n" v, , 0x4)
-                            if InStr(v, ";", , (-StrLen(v))) or msgboxResult = "Yes"
+                            if InStr(v, ";", , (-StrLen(v))) or (IsSet(msgboxResult) and msgboxResult = "Yes")
                                 continue
                             v := this.process_Keywords(v)
                                 , oldv := v
@@ -341,7 +342,8 @@ Class WatchFile Extends Watchdog_Base {
 
 Class Strega_Watcher {
     History_CountThreshold := 500
-    __New(PathsObj, TargetObj, StoredTimestamp := "") {
+    _encoding := "UTF-8"
+    __New(PathsObj, TargetObj, objStoredTimestamp := StoredTimestamp()) {
         this.DefineProp("startUp", { Value: A_Now })
             , this.DefineProp("Count", { Value: { History: 0 } })
             ; , this.DefineProp("Watchers", { Value: PathsObj })
@@ -349,7 +351,8 @@ Class Strega_Watcher {
             ; In case I need a pointer to the original Obj. Otherwise this should suffice
             , this.DefineProp("Watchers", { Value: PathsObj.Paths })
             , this.DefineProp("Targets", { Value: TargetObj.Targets })
-            , this.DefineProp("storedTimestamp", { Value: StoredTimestamp })
+            , this.DefineProp("Class", { Value: { watcher: PathsObj, target: TargetObj } })
+            , this.DefineProp("storedTimestamp", { Value: objStoredTimestamp })
             , this.DefineProp("Ticks", { Value: Object() })
 
         return this
@@ -402,6 +405,7 @@ Class Strega_Watcher {
                     conflicts: "",
                     fileIndex: "",
                     matchedFiles: 0,
+                    matched_firstTargetPath: "",
                     matched_firstTargetKey: ""
                 } }) ; * a way to access the current Source Path I'm iterating
 
@@ -410,7 +414,8 @@ Class Strega_Watcher {
                     conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
                     fileIndex: "Access the current Index of the loop file",
                     matchedFiles: "Access the current amount of matched files in the iteration",
-                    matched_firstTargetKey: "This will store the first target match of the file"
+                    matched_firstTargetPath: "This will store the first target match of the file",
+                    matched_firstTargetKey: "Stores the Target Key of the first match"
                 } }) ; Descriptions of this._loop's properties
                     , this.Ticks.Folder := this.QPC()
                 loop files this._loop.source, "F"
@@ -434,15 +439,14 @@ Class Strega_Watcher {
     }
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
-        msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
+        DisplayMap(this.Class.target["UserDefined"], A_LineNumber)
         If this._Watcher.Value["Age_asCountdown"] and (hasTimestamp := this.hasTimestamp())
         ; * If hasTimestamp registers as set, we can then know that we're working with a countdown, and that the timestamp has to be created.
         ; * If it's set, we just update the digital timestamp.
             If DateDiff(A_Now, this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file has a registered timestamp and it's below the TimeUp it will skip the file
                 return 0
-        msgbox UDF.getPropsList(this._Watcher, A_LineNumber)
-        msgbox UDF.getPropsList(this.LF, A_LineNumber)
-        DisplayMap(this._Watcher.Value, A_LineNumber)
+        ; msgbox UDF.getPropsList(this._Watcher, A_LineNumber)
+        ; msgbox UDF.getPropsList(this.LF, A_LineNumber)
         this._loop.conflicts := [] ; * This will keep tracks cases when there're more than a single target match
         for TargetKey in this._Watcher.Value["TargetKeys"]
         {
@@ -460,23 +464,13 @@ Class Strega_Watcher {
             if match
             {
                 this._loop.conflicts.Push(TargetKey)
-                if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first match
-                    this._loop.matched_firstTargetKey := this.Targets[TargetKey]["Target"],
-                    this.storedTimestamp[this.__loop.source][this.LF.fullName] := A_Now
+                if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first matching Watcher's TargetKey 
+                    this._loop.matched_firstTargetPath := this.Targets[TargetKey]["Target"],
+                    this._loop.matched_firstTargetKey := TargetKey,
+                    this._loop.regex_matches := match,
+                    this.storedTimestamp[this._loop.source][this.LF.fullName] := A_Now
                 ; * so If I'm not wrong, if I want to clean up unused Timestamps, I only have to compare if both StoreTimeStamp[][].Value == StoreTimeStamp[][].lastModified to know it didn't trigger
-                ; * This method should let me know that the file no longer exists, and there's no use to keep it in system... Hopefully
-
-
-                ; * Dump this below to this.send_File() to do the logging there instead
-                If !this._loop.matchedFiles ; * This is to discriminate between the first match and subsequent ones.
-                    ; * It's purpose is to add a header to the list that will identify the logging info
-                    this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
-                        this._loop.source, this.Targets[TargetKey].type, JXON.Dump(this.Targets[TargetKey].Targets), A_Tab
-                    )
-                if this._loop.conflicts.Length = 1 {
-                    this.History := Format("[{1}]{2}({3})`r`n", this._loop.fileIndex, this.LF.fullName, match)
-                    ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
-                }
+                ; * This method should let me know that the file no longer exists, and there's no use to keep it in system... Hopefully works as intended
             }
         }
         if !!this._loop.conflicts.Length
@@ -491,7 +485,69 @@ Class Strega_Watcher {
     }
 
     send_File() {
+        Target := this._loop.matched_firstTargetKey
+        If this._loop.matchedFiles = 1 ; * This is to discriminate between the first match and subsequent ones.
+            ; * It's purpose is to add a header to the list that will identify the start of logging data
+            this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
+                this._loop.source, this.Targets[Target].type, JXON.Dump(this.Targets[Target].Targets), A_Tab
+            )
+        if this._loop.conflicts.Length {
+            if this._loop.conflicts.Length > 1
+            {
+                Conflicts := "`r`n" A_Tab "Conflicts:`r`n"
+                Temp_Arr := this._loop.conflicts.Clone, Temp_Arr.RemoveAt(1)
+                for val in Temp_Arr
+                    Conflicts .= A_Tab Val "`r`n"
+            }
+            this.History := Format("[{1}]{2}({3})" . IsSet(Conflicts) ? Conflicts : "", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches)
+            ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
+        }
+    }
 
+    get_contextKeywords() {
+        ; Registered ~06.65E-3ms per call using Arrow Function 2023/04/23
+        ; Registered ~13.65E-3ms per call using strings 2023/04/23
+        temp := this.LF.timeModified,
+            myMap := Map(),
+            myMap.CaseSense := "Off",
+            myMap.Set(
+                "YearMonth", FormatTime(temp, "YearMonth"),
+                "YDay", FormatTime(temp, "YDay"),
+                "YDay0", FormatTime(temp, "YDay0"),
+                "WDay", FormatTime(temp, "WDay"),
+                "YWeek", FormatTime(temp, "YWeek"),
+                "d", FormatTime(temp, "d"),
+                "dd", FormatTime(temp, "dd"),
+                "ddd", FormatTime(temp, "ddd"),
+                "dddd", FormatTime(temp, "dddd"),
+                "M", FormatTime(temp, "M"),
+                "MM", FormatTime(temp, "MM"),
+                "MMM", FormatTime(temp, "MMM"),
+                "MMMM", FormatTime(temp, "MMMM"),
+                "y", FormatTime(temp, "y"),
+                "yy", FormatTime(temp, "yy"),
+                "yyyy", FormatTime(temp, "yyyy"),
+            )
+            ; myMap.Set(
+            ;     "YearMonth", () => FormatTime(temp, "YearMonth"),
+            ;     "YDay", () => FormatTime(temp, "YDay"),
+            ;     "YDay0", () => FormatTime(temp, "YDay0"),
+            ;     "WDay", () => FormatTime(temp, "WDay"),
+            ;     "YWeek", () => FormatTime(temp, "YWeek"),
+            ;     "d", () => FormatTime(temp, "d"),
+            ;     "dd", () => FormatTime(temp, "dd"),
+            ;     "ddd", () => FormatTime(temp, "ddd"),
+            ;     "dddd", () => FormatTime(temp, "dddd"),
+            ;     "M", () => FormatTime(temp, "M"),
+            ;     "MM", () => FormatTime(temp, "MM"),
+            ;     "MMM", () => FormatTime(temp, "MMM"),
+            ;     "MMMM", () => FormatTime(temp, "MMMM"),
+            ;     "y", () => FormatTime(temp, "y"),
+            ;     "yy", () => FormatTime(temp, "yy"),
+            ;     "yyyy", () => FormatTime(temp, "yyyy"),
+            ; )
+            , myMap.Set("Year", myMap["yyyy"], "Month", myMap["MM"], "Mon", myMap["MM"], "Day", myMap["dd"])
+        return myMap
     }
 
     store_FileInstance() {
@@ -505,8 +561,8 @@ Class Strega_Watcher {
         ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
         this.DefineProp("LF", { value: fileObj })
     }
-    Dump(content, file := A_ScriptDir "\logs.txt", Encryption := "UTF-8") { ; Dumps history into the file
-
+    Dump(content, file := A_ScriptDir "\logs.txt", Encryption := this._encoding, overwrite := 0) { ; Dumps history into the file
+        ;* Unfinished
     }
     procedureIndex {
         set {
@@ -550,8 +606,8 @@ Class Strega_Watcher {
 
 Class StoredTimestamp extends Watchdog_Base {
     __New(Path := "", type := "Text", encoding := this._encoding) {
-        if Path := ""
-            throw ValueError("No path defined!", , type(this))
+        if (Path = "") ; this is for in case there's no data stored, so we skip all this below
+            return this
         this.DefineProp("__path", { Value: StrLen(path) })
             , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
@@ -581,18 +637,16 @@ Class StoredTimestamp extends Watchdog_Base {
         }
     }
 
-    Dump(inputMap, path := "") {
+    Dump(inputMap, path := this.__path) {
         tempMap := Map()
         for k_Path, v_Files in inputMap
             for k_Files, v_other in v_Files
                 tempMap.Set(k_path, Map(k_Files, inputMap[k_Path][k_Files].Value))
-        if (path = "")
-            path := this.__path
         if !FileExist(path) {
             DisplayMap(tempMap, A_LineNumber, 1)
             throw ValueError(Format("There's no valid path to dump values in {}", Type(this)), , path)
         } else DisplayMap(tempMap, A_LineNumber, 1)
-        FileOpen(this.__path, 0x1, this._encoding).Write(JXON.dump(tempMap, 1))
+        FileOpen(path, 0x1, this._encoding).Write(JXON.dump(tempMap, 1))
     }
     ; { Inner Classes
 

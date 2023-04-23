@@ -1,8 +1,29 @@
 {
 	"test":{"Target":"C:\\Temp - AHK\\File Sorter"},
-	"DateKeys" : ["<Year>", "<Month>", "<Day>"],
 	"SpecialKeys" : [""],
 	"FileDateType" : "LastModified",
+	"ContextKeys": [
+		"Year",
+		"Month",
+		"Mon",
+		"Day",
+		"YearMonth",
+		"YDay",
+		"YDay0",
+		"WDay",
+		"YWeek",
+		"d",
+		"dd",
+		"ddd",
+		"dddd",
+		"M",
+		"MM",
+		"MMM",
+		"MMMM",
+		"y",
+		"yy",
+		"yyyy"
+	],
 	"UserDefined" : {
 		"myName1" : "NombreArbitrario1",
 		"myName2" : "NombreArbitrario2"

@@ -5,7 +5,7 @@
 #Include <Watchdog - Copy>
 
 
-If viel := thisFunc1(1) and (viel += thisFunc2(0) * 2)
+If (viel := thisFunc1(1)) and (viel += thisFunc2(0) * 2)
     msgbox "hellowWorld " viel
 else msgbox "fgalse " viel
 
