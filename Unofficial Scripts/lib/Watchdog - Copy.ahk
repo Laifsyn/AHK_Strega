@@ -340,7 +340,7 @@ Class WatchFile Extends Watchdog_Base {
 
 }
 
-Class Strega_Watcher {
+Class Strega_Watcher extends Watchdog_Base {
     History_CountThreshold := 500
     _encoding := "UTF-8"
     __New(PathsObj, TargetObj, objStoredTimestamp := StoredTimestamp()) {
@@ -464,7 +464,7 @@ Class Strega_Watcher {
             if match
             {
                 this._loop.conflicts.Push(TargetKey)
-                if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first matching Watcher's TargetKey 
+                if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first matching Watcher's TargetKey
                     this._loop.matched_firstTargetPath := this.Targets[TargetKey]["Target"],
                     this._loop.matched_firstTargetKey := TargetKey,
                     this._loop.regex_matches := match,
@@ -495,13 +495,25 @@ Class Strega_Watcher {
             if this._loop.conflicts.Length > 1
             {
                 Conflicts := "`r`n" A_Tab "Conflicts:`r`n"
-                Temp_Arr := this._loop.conflicts.Clone, Temp_Arr.RemoveAt(1)
-                for val in Temp_Arr
+                for val in this._loop.conflicts
                     Conflicts .= A_Tab Val "`r`n"
             }
-            this.History := Format("[{1}]{2}({3})" . IsSet(Conflicts) ? Conflicts : "", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches)
+            this.History := Format("[{1}]{2}({3}){4}", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches, IsSet(Conflicts) ? Conflicts : "")
             ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
         }
+
+        msgbox UDF.getPropsList(this._loop, A_LineNumber)
+        SourcePattern := Format("{}\{}", RTrim(this._loop.source, "*"), this.LF.fullName)
+        DestPattern := this.process_CustomKeywords(Format("{}\", RTrim(this._loop.matched_firstTargetPath, "")), this.get_contextKeywords())
+        if !FileExist(DestPattern)
+            try
+                DirCreate(DestPattern)
+            catch Error as E
+                msgbox UDF.ErrorFormat(E)
+        msgbox "Source`r`n" "`r`n" SourcePattern "→" FileExist(SourcePattern) "`r`n" this.LF.fullPath "→" FileExist(this.LF.fullPath) "`r`nTarget" "`r`n" DestPattern "→" FileExist(DestPattern)
+        FileCopy SourcePattern, DestPattern "\*.*", 0
+        pause
+        ; this.History["Target: " this._loop.]
     }
 
     get_contextKeywords() {

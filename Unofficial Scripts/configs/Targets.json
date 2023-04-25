@@ -73,7 +73,7 @@
 			},
 		"2" : {
 			"SearchKeys" : ["jpg", "png", "lnk", "ahk"],
-			"Target" : "C:\\Temp - AHK\\Test\\Target\\<Year>\\<Month>\\<Day>",
+			"Target" : "C:\\myTemp - AHK\\Test\\Target\\<Year>\\<Month>\\<Day>",
 			"Action" : "Move" ,
 			"Type" : "Filetype" ,
 			"SortByDate" : 0 ,
