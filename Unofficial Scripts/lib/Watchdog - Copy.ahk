@@ -439,7 +439,6 @@ Class Strega_Watcher extends Watchdog_Base {
     }
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
-        DisplayMap(this.Class.target["UserDefined"], A_LineNumber)
         If this._Watcher.Value["Age_asCountdown"] and (hasTimestamp := this.hasTimestamp())
         ; * If hasTimestamp registers as set, we can then know that we're working with a countdown, and that the timestamp has to be created.
         ; * If it's set, we just update the digital timestamp.
@@ -488,21 +487,21 @@ Class Strega_Watcher extends Watchdog_Base {
         Target := this._loop.matched_firstTargetKey
         If this._loop.matchedFiles = 1 ; * This is to discriminate between the first match and subsequent ones.
             ; * It's purpose is to add a header to the list that will identify the start of logging data
-            this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
+            this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}`r`n",
                 this._loop.source, this.Targets[Target].type, JXON.Dump(this.Targets[Target].Targets), A_Tab
             )
-        if this._loop.conflicts.Length {
-            if this._loop.conflicts.Length > 1
-            {
-                Conflicts := "`r`n" A_Tab "Conflicts:`r`n"
-                for val in this._loop.conflicts
-                    Conflicts .= A_Tab Val "`r`n"
-            }
-            this.History := Format("[{1}]{2}({3}){4}", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches, IsSet(Conflicts) ? Conflicts : "")
-            ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
-        }
 
-        msgbox UDF.getPropsList(this._loop, A_LineNumber)
+        if this._loop.conflicts.Length > 1
+        {
+            Conflicts := Format("`r`n" A_Tab "Conflicts({}): ", this._loop.conflicts.Length)
+            for val in this._loop.conflicts
+                Conflicts .= Format("{}, ", val)
+            Conflicts := RTrim(Conflicts, ", ")
+        }
+        this.History := Format("[{1}]{5}`"{2}`"({3}){4}`r`n", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches, IsSet(Conflicts) ? Conflicts : "", Format("T[`"{}`"]", this.Targets[Target].__parentKey))
+        ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
+
+        ; msgbox UDF.getPropsList(this._loop, A_LineNumber)
         SourcePattern := Format("{}\{}", RTrim(this._loop.source, "*"), this.LF.fullName)
         DestPattern := this.process_CustomKeywords(Format("{}\", RTrim(this._loop.matched_firstTargetPath, "")), this.get_contextKeywords())
         if !FileExist(DestPattern)
@@ -510,9 +509,9 @@ Class Strega_Watcher extends Watchdog_Base {
                 DirCreate(DestPattern)
             catch Error as E
                 msgbox UDF.ErrorFormat(E)
-        msgbox "Source`r`n" "`r`n" SourcePattern "→" FileExist(SourcePattern) "`r`n" this.LF.fullPath "→" FileExist(this.LF.fullPath) "`r`nTarget" "`r`n" DestPattern "→" FileExist(DestPattern)
-        FileCopy SourcePattern, DestPattern "\*.*", 0
-        pause
+        ; msgbox "Source`r`n" "`r`n" SourcePattern "→" FileExist(SourcePattern) "`r`n" this.LF.fullPath "→" FileExist(this.LF.fullPath) "`r`nTarget" "`r`n" DestPattern "→" FileExist(DestPattern)
+        ;FileCopy SourcePattern, DestPattern "\*.*", 0
+
         ; this.History["Target: " this._loop.]
     }
 
