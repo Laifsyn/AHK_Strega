@@ -5,15 +5,6 @@
 #Include <Watchdog - Copy>
 
 
-If (viel := thisFunc1(1)) and (viel += thisFunc2(0) * 2)
-    msgbox "hellowWorld " viel
-else msgbox "fgalse " viel
-
-thisFunc1(arg) => !!arg
-thisFunc2(arg) {
-    MsgBox "helloss"
-    return !!arg
-}
 
 
 msgbox A_UserName

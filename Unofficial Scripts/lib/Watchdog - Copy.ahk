@@ -434,6 +434,12 @@ Class Strega_Watcher extends Watchdog_Base {
                 , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", last_sourceIndex, last_fileIndex, Watcher)
                 , last_fileIndex := 0, last_sourceIndex := 0
         }
+        text := ""
+        if true
+            for key, val in this.storedTimestamp.clone()
+                for key2, val2 in val
+                    text .= Format("{}[{}] = {}`r`n", rTrim(key, '* '), key2, val2.Value)
+        SetListVars(text, 1)
         SetListVars(this.History, 1)
         msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
     }
@@ -617,10 +623,10 @@ Class Strega_Watcher extends Watchdog_Base {
 
 Class StoredTimestamp extends Watchdog_Base {
     __New(Path := "", type := "Text", encoding := this._encoding) {
+        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
         if (Path = "") ; this is for in case there's no data stored, so we skip all this below
             return this
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+        this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
         for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
