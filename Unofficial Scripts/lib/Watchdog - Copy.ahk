@@ -407,17 +407,17 @@ Class Strega_Watcher extends Watchdog_Base {
                     matchedFiles: 0,
                     matched_firstTargetPath: "",
                     matched_firstTargetKey: ""
-                } }) ; * a way to access the current Source Path I'm iterating
-
-                this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
-                    sourceIndex: "This leaves access to the current Source Index ",
-                    conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
-                    fileIndex: "Access the current Index of the loop file",
-                    matchedFiles: "Access the current amount of matched files in the iteration",
-                    matched_firstTargetPath: "This will store the first target match of the file",
-                    matched_firstTargetKey: "Stores the Target Key of the first match"
-                } }) ; Descriptions of this._loop's properties
-                    , this.Ticks.Folder := this.QPC()
+                } }) ; * Data that's related to the current iterating _loop
+                if false ; This skips the step of having it getting set. I keep it uncommented just for the sakes of keeping the formatting in the code editor
+                    this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
+                        sourceIndex: "This leaves access to the current Source Index ",
+                        conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
+                        fileIndex: "Access the current Index of the loop file",
+                        matchedFiles: "Access the current amount of matched files in the iteration",
+                        matched_firstTargetPath: "This will store the first target match of the file",
+                        matched_firstTargetKey: "Stores the Target Key of the first match"
+                    } }) ; Descriptions of this._loop's properties
+                this.Ticks.Folder := this.QPC()
                 loop files this._loop.source, "F"
                 {
                     this._loop.fileIndex := A_Index ; * So I can get access to the current file index that's in iteration
@@ -626,6 +626,8 @@ Class StoredTimestamp extends Watchdog_Base {
         this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
         if (Path = "") ; this is for in case there's no data stored, so we skip all this below
             return this
+        if FileExist(Path)
+            this.DefineProp("__path", { Value: Path })
         this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
             , JsonMap := this.transformString(Path, Type, encoding)
         for k_Path, v_Files in JsonMap
