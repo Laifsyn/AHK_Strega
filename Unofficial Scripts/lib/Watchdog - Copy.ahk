@@ -135,9 +135,12 @@ class Watchdog_Base extends Map {
 
 Class TargetFile extends Watchdog_Base {
     __New(Path, type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
+        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Targets.json" })
+        if FileExist(Path)
+            this.DefineProp("__path", { Value: Path })
+        if FileExist(this.__path)
+            this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
+        JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
             , this.Targets := TargetFile.Configs(this["Targets"], this) ; I will be able to keep an intact this["Targets"]
         return this
@@ -235,9 +238,12 @@ Class TargetFile extends Watchdog_Base {
 
 Class WatchFile Extends Watchdog_Base {
     __New(Path, Type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
+        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Paths.json" }) ; By defining a default path, I can initialize an empty instance and be able to store the changes
+        if FileExist(Path)
+            this.DefineProp("__path", { Value: Path })
+        if FileExist(this.__path)
+            this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
+        JsonMap := this.transformString(Path, Type, encoding)
             , this.mergeMap(this, JsonMap)
             , WatcherConfigs := this["WatcherConfigs"]
             , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; I will be able to keep an intact this["Paths"]
@@ -393,56 +399,64 @@ Class Strega_Watcher extends Watchdog_Base {
 
             ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
             this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
-                , last_fileIndex := 0, last_sourceIndex := 0
             ; displaymap(this._Watcher.Value, A_LineNumber, 1)
             ; DisplayMap(Settings, A_LineNumber)
             ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
+            this.DefineProp("_loop", { value: { source: "",
+                sourceIndex: 0,
+                conflicts: [],
+                fileIndex: 0,
+                totalFiles: 0,
+                matchedFiles: 0,
+                matched_firstTargetPath: "",
+                matched_firstTargetKey: ""
+            } }) ; * Data that's related to the current iterating _loop
+            if false ; This skips the step of having it getting set. I keep it uncommented just for the sakes of keeping the formatting in the code editor
+                this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
+                    sourceIndex: "This leaves access to the current Source Index. Depending on where yo ucall, you might as well call it the last index of the iteration",
+                    conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
+                    fileIndex: "Access the current Index of the loop file. Depending on where you call, you might as well call it the last index of the iteration",
+                    totalFiles: "Stores the total files that the program has already iterated in the Watcher. However, its increments goes by n Amount, where n is the amount a Watcher's source path has been gone through",
+                    matchedFiles: "Access the current amount of matched files in the iteration",
+                    matched_firstTargetPath: "This will store the first target match of the file",
+                    matched_firstTargetKey: "Stores the Target Key of the first match"
+                } }) ; Descriptions of this._loop's properties
+            this.Ticks.Watcher := this.QPC()
+            ticks := 0
             for Source in this._Watcher.Value["Source"]
             {
 
-                this.DefineProp("_loop", { value: { source: Source,
-                    sourceIndex: A_Index,
-                    conflicts: "",
-                    fileIndex: "",
-                    matchedFiles: 0,
-                    matched_firstTargetPath: "",
-                    matched_firstTargetKey: ""
-                } }) ; * Data that's related to the current iterating _loop
-                if false ; This skips the step of having it getting set. I keep it uncommented just for the sakes of keeping the formatting in the code editor
-                    this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
-                        sourceIndex: "This leaves access to the current Source Index ",
-                        conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
-                        fileIndex: "Access the current Index of the loop file",
-                        matchedFiles: "Access the current amount of matched files in the iteration",
-                        matched_firstTargetPath: "This will store the first target match of the file",
-                        matched_firstTargetKey: "Stores the Target Key of the first match"
-                    } }) ; Descriptions of this._loop's properties
-                this.Ticks.Folder := this.QPC()
+                this._loop.source := Source
+                    , this._loop.sourceIndex := A_Index
+                    , this._loop.matchedFiles := 0
+                    , this.Ticks.Folder := this.QPC()
                 loop files this._loop.source, "F"
                 {
                     this._loop.fileIndex := A_Index ; * So I can get access to the current file index that's in iteration
                         , this.store_FileInstance() ; * this is to store the Loop Files variables into an object
                     If this.fileMatch_Logic()
                         this.send_File()
-                    last_fileIndex += 1
                 }
-                this.History := "`r`n" ; Logging Related - Adds a blank line to separate a Source Iteration
-                    , last_sourceIndex += 1
+                ; msgbox UDF.getPropsList(this._loop) "`r`n" . (this._loop.fileIndex = this._loop.fileIndex) " " Format("{}={}", this._loop.fileIndex, this._loop.fileIndex)
+                this.History[, "INFO", 0] := Format("Total Matching Files: {}`r`n`tTime:{}ms, avg({}ms/File) of {}ms/File`r`n", this._loop.matchedFiles, temp := this.QPC(this.Ticks.Folder), Round(temp / this._loop.matchedFiles, 3), Round(temp / this._loop.fileIndex, 3))
+                , ticks := Round(ticks + temp, 2)
+                , this._loop.totalFiles += this._loop.fileIndex
             }
-            ticks := this.QPC(this.ticks.Folder)
-                , totalTime += ticks
-                , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", last_sourceIndex, last_fileIndex, Watcher)
-                , last_fileIndex := 0, last_sourceIndex := 0
+            ; ticks := this.QPC(this.ticks.Watcher)
+            totalTime += ticks
+                , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", this._loop.sourceIndex, this._loop.totalFiles, Watcher)
+                , this.History[, ""] := "`r`n"
         }
         text := ""
         if true
-            for key, val in this.storedTimestamp.clone()
-                for key2, val2 in val
-                    text .= Format("{}[{}] = {}`r`n", rTrim(key, '* '), key2, val2.Value)
-        SetListVars(text, 1)
-        SetListVars(this.History, 1)
-        msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
+        { for key, val in this.storedTimestamp.clone()
+            for key2, val2 in val
+                text .= Format("{}{} = {}`r`n", rTrim(key, '* '), key2, val2.Value)
+            SetListVars(text "`r`n" this.History "`r`n`r`n" Round(totalTime, 2) "ms `r`n" watcherTicks)
+            ; msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
+        }
     }
+
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
         If this._Watcher.Value["Age_asCountdown"] and (hasTimestamp := this.hasTimestamp())
@@ -482,6 +496,7 @@ Class Strega_Watcher extends Watchdog_Base {
             this._loop.matchedFiles += 1
         return !!this._loop.conflicts.Length
     }
+
     hasTimestamp() => this.storedTimestamp.Has(this.LF.path) And this.storedTimestamp[this.__loop.source].Has(this.LF.fullName)
 
     get_StoredAge() => this.storedTimestamp[this.__loop.source][this.LF.fullName].Value
@@ -493,10 +508,12 @@ Class Strega_Watcher extends Watchdog_Base {
         Target := this._loop.matched_firstTargetKey
         If this._loop.matchedFiles = 1 ; * This is to discriminate between the first match and subsequent ones.
             ; * It's purpose is to add a header to the list that will identify the start of logging data
+        { if this._loop.sourceIndex > 1
+            this.History[, ""] := stringJoin("-", 50) "`r`n"
             this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}`r`n",
                 this._loop.source, this.Targets[Target].type, JXON.Dump(this.Targets[Target].Targets), A_Tab
             )
-
+        }
         if this._loop.conflicts.Length > 1
         {
             Conflicts := Format("`r`n" A_Tab "Conflicts({}): ", this._loop.conflicts.Length)
@@ -510,6 +527,7 @@ Class Strega_Watcher extends Watchdog_Base {
         ; msgbox UDF.getPropsList(this._loop, A_LineNumber)
         SourcePattern := Format("{}\{}", RTrim(this._loop.source, "*"), this.LF.fullName)
         DestPattern := this.process_CustomKeywords(Format("{}\", RTrim(this._loop.matched_firstTargetPath, "")), this.get_contextKeywords())
+        this.History[A_Tab SourcePattern, ""] := DestPattern "*.*`r`n"
         if !FileExist(DestPattern)
             try
                 DirCreate(DestPattern)
@@ -594,9 +612,9 @@ Class Strega_Watcher extends Watchdog_Base {
     }
     History[Detail := "", InfoType := "LOG", CountStep := 1, Dump := 0] {
         set {
-            if Value = "`r`n"
+            if (InfoType = "")
             {
-                this._History := this.History "`r`n"
+                this._History := this.History (Detail = "" ? "" : Detail "→") Value
                 return
             }
             this.Count.History += CountStep
@@ -621,6 +639,7 @@ Class Strega_Watcher extends Watchdog_Base {
 
 }
 
+
 Class StoredTimestamp extends Watchdog_Base {
     __New(Path := "", type := "Text", encoding := this._encoding) {
         this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
@@ -629,7 +648,7 @@ Class StoredTimestamp extends Watchdog_Base {
         if FileExist(Path)
             this.DefineProp("__path", { Value: Path })
         this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
+            , JsonMap := this.transformString(this.__path, Type, encoding)
         for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
                 this[k_Path] := StoredTimestamp.File(k_Files, {

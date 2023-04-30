@@ -2,7 +2,24 @@
 
 
 ; Functions
+stringJoin(inputString, Amount) {
+	temp := ""
+	Loop Amount
+		temp .= InputString
+	return temp
+}
 
+QPC(Counter := "", Decimals := 2) {
+	static freq
+	If Counter = ""
+	{
+		DllCall("QueryPerformanceFrequency", "Int64*", &freq := 0)
+			, DllCall("QueryPerformanceCounter", "Int64*", &Counter := 0)
+		return Counter
+	}
+	DllCall("QueryPerformanceCounter", "Int64*", &CounterAfter := 0)
+	return Round((CounterAfter - Counter) / Freq * 1000, Decimals)
+}
 SetListVars(Text, DoWaitMsg := 0, msgboxText := "Waiting.....") {
 	ListVars
 	WinWaitActive "ahk_class AutoHotkey"
@@ -40,7 +57,7 @@ Class UDF {
 				Value := Format(" : [{1:#x}] {2}", ObjPtr(_), ObjType type_Size)
 			}
 			else
-				Value := ((ValLen := strlen(_)) >= maxStrLen ? Format("{}...({})", SubStr(_, 1, StrOffset:=maxStrLen - 10), ValLen-StrOffset) : _)
+				Value := ((ValLen := strlen(_)) >= maxStrLen ? Format("{}...({})", SubStr(_, 1, StrOffset := maxStrLen - 10), ValLen - StrOffset) : _)
 			Text .= Format("{} : {}`r`n", prop, Value)
 		}
 		return (LineNumber = "" ? "" : LineNumber "`r`n") Text
