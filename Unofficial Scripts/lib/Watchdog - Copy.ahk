@@ -38,7 +38,7 @@ class Watchdog_Base extends Map {
         return Val
     }
 
-    InQuote(Input) => "`"" Input "`""
+    InQuote(Input, chars := "`"") => chars Input chars
 
     LogFormat() {
         Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
@@ -407,9 +407,13 @@ Class Strega_Watcher extends Watchdog_Base {
                 conflicts: [],
                 fileIndex: 0,
                 totalFiles: 0,
+                pastMatchedFiles: 0,
                 matchedFiles: 0,
                 matched_firstTargetPath: "",
-                matched_firstTargetKey: ""
+                matched_firstTargetKey: "",
+                matchingThreshold: 5,
+                regex_matches: 0,
+                regEx: []
             } }) ; * Data that's related to the current iterating _loop
             if false ; This skips the step of having it getting set. I keep it uncommented just for the sakes of keeping the formatting in the code editor
                 this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
@@ -417,9 +421,13 @@ Class Strega_Watcher extends Watchdog_Base {
                     conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
                     fileIndex: "Access the current Index of the loop file. Depending on where you call, you might as well call it the last index of the iteration",
                     totalFiles: "Stores the total files that the program has already iterated in the Watcher. However, its increments goes by n Amount, where n is the amount a Watcher's source path has been gone through",
+                    pastMatchedFiles: "Stores the last matchedFiles iteration amount ",
                     matchedFiles: "Access the current amount of matched files in the iteration",
                     matched_firstTargetPath: "This will store the first target match of the file",
-                    matched_firstTargetKey: "Stores the Target Key of the first match"
+                    matched_firstTargetKey: "Stores the Target Key of the first match",
+                    matchingThreshold: "This describe the amounts of matched files it requires to let it add separation lines for readability",
+                    regex_matches: "Stores how many regEx keys matched",
+                    regEx: "Stores the regex keys that matched"
                 } }) ; Descriptions of this._loop's properties
             this.Ticks.Watcher := this.QPC()
             ticks := 0
@@ -437,15 +445,21 @@ Class Strega_Watcher extends Watchdog_Base {
                     If this.fileMatch_Logic()
                         this.send_File()
                 }
-                ; msgbox UDF.getPropsList(this._loop) "`r`n" . (this._loop.fileIndex = this._loop.fileIndex) " " Format("{}={}", this._loop.fileIndex, this._loop.fileIndex)
-                this.History[, "INFO", 0] := Format("Total Matching Files: {}`r`n`tTime:{}ms, avg({}ms/File) of {}ms/File`r`n", this._loop.matchedFiles, temp := this.QPC(this.Ticks.Folder), Round(temp / this._loop.matchedFiles, 3), Round(temp / this._loop.fileIndex, 3))
-                , ticks := Round(ticks + temp, 2)
-                , this._loop.totalFiles += this._loop.fileIndex
+
+                temp := this.QPC(this.Ticks.Folder)
+                    , ticks := Round(ticks + temp, 2)
+                    , this._loop.totalFiles += this._loop.fileIndex
+                    , this._loop.pastMatchedFiles := this._loop.matchedFiles
+
+                If this._loop.matchedFiles > this._loop.matchingThreshold
+                    this.History[, "INFO", 0] := Format("Total Matching Files: {}`r`n`tTime:{}ms, avg. {}ms/File`r`n"
+                        , this._loop.matchedFiles
+                        , Temp
+                        , Round(temp / this._loop.fileIndex, 3))
             }
-            ; ticks := this.QPC(this.ticks.Watcher)
             totalTime += ticks
                 , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", this._loop.sourceIndex, this._loop.totalFiles, Watcher)
-                , this.History[, ""] := "`r`n"
+                , (this._loop.matchedFiles > 0) ? this.History[, ""] := "`r`n" : ""
         }
         text := ""
         if true
@@ -459,13 +473,11 @@ Class Strega_Watcher extends Watchdog_Base {
 
     fileMatch_Logic() { ; * Tells whether the file matches the predefined conditions
         ; msgbox this._loop.source " `r`n" this.LF.fullName
-        If this._Watcher.Value["Age_asCountdown"] and (hasTimestamp := this.hasTimestamp())
-        ; * If hasTimestamp registers as set, we can then know that we're working with a countdown, and that the timestamp has to be created.
-        ; * If it's set, we just update the digital timestamp.
-            If DateDiff(A_Now, this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file has a registered timestamp and it's below the TimeUp it will skip the file
+        If this._Watcher.Value["Age_asCountdown"] and (hasTimeStamp := this.hasTimestamp())
+        ; * If hasTimestamp registers as true, we can then know that we're working with a countdown, and that the timestamp already exists.
+        ; * Otherwise, if we detect that hasTimeStamp is false, we will return false after creating the timestamp
+            If DateDiff(A_Now, digitalTimeStamp := this.get_StoredAge(), "s") <= this._Watcher.Value["TimeUp"] ; * If the file's digital timestamp is below the TimeUp it will skip the file
                 return 0
-        ; msgbox UDF.getPropsList(this._Watcher, A_LineNumber)
-        ; msgbox UDF.getPropsList(this.LF, A_LineNumber)
         this._loop.conflicts := [] ; * This will keep tracks cases when there're more than a single target match
         for TargetKey in this._Watcher.Value["TargetKeys"]
         {
@@ -477,17 +489,26 @@ Class Strega_Watcher extends Watchdog_Base {
                 case "Keyword":
                     fileName := this.LF.name
             }
-            match := 0
+            match := []
             For regKey in this.Targets[TargetKey].Targets
-                match += !!RegExMatch(fileName, regKey)  ; * To know how many regex keys matches the filename
-            if match
+                If RegExMatch(fileName, regKey)
+                    match.Push(regKey)  ; * To know how many regex keys matches the filename
+            if match.Length
             {
                 this._loop.conflicts.Push(TargetKey)
                 if (this._loop.conflicts.Length = 1) ; * Code block that only runs for the first matching Watcher's TargetKey
+                {
                     this._loop.matched_firstTargetPath := this.Targets[TargetKey]["Target"],
                     this._loop.matched_firstTargetKey := TargetKey,
-                    this._loop.regex_matches := match,
-                    this.storedTimestamp[this._loop.source][this.LF.fullName] := A_Now
+                    this._loop.regex_matches := match.Length,
+                    this._loop.regEx := match
+                    If IsSet(digitalTimeStamp)
+                        this.storedTimestamp[this._loop.source].Delete(this.LF.fullName)
+                    else
+                        this.storedTimestamp[this._loop.source][this.LF.fullName] := A_Now
+                    if IsSet(hasTimeStamp) and !hasTimeStamp
+                        return False
+                }
                 ; * so If I'm not wrong, if I want to clean up unused Timestamps, I only have to compare if both StoreTimeStamp[][].Value == StoreTimeStamp[][].lastModified to know it didn't trigger
                 ; * This method should let me know that the file no longer exists, and there's no use to keep it in system... Hopefully works as intended
             }
@@ -508,11 +529,11 @@ Class Strega_Watcher extends Watchdog_Base {
         Target := this._loop.matched_firstTargetKey
         If this._loop.matchedFiles = 1 ; * This is to discriminate between the first match and subsequent ones.
             ; * It's purpose is to add a header to the list that will identify the start of logging data
-        { if this._loop.sourceIndex > 1
+        { if this._loop.sourceIndex > 1 and this._loop.pastMatchedFiles > 2
             this.History[, ""] := stringJoin("-", 50) "`r`n"
-            this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}`r`n",
-                this._loop.source, this.Targets[Target].type, JXON.Dump(this.Targets[Target].Targets), A_Tab
-            )
+            ; this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}`r`n",
+            ;     this._loop.source, this.Targets[Target].type, JXON.Dump(this.Targets[Target].Targets), A_Tab
+            ; )
         }
         if this._loop.conflicts.Length > 1
         {
@@ -521,13 +542,18 @@ Class Strega_Watcher extends Watchdog_Base {
                 Conflicts .= Format("{}, ", val)
             Conflicts := RTrim(Conflicts, ", ")
         }
-        this.History := Format("[{1}]{5}`"{2}`"({3}){4}`r`n", this._loop.fileIndex, this.LF.fullName, this._loop.regex_matches, IsSet(Conflicts) ? Conflicts : "", Format("T[`"{}`"]", this.Targets[Target].__parentKey))
-        ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
-
-        ; msgbox UDF.getPropsList(this._loop, A_LineNumber)
-        SourcePattern := Format("{}\{}", RTrim(this._loop.source, "*"), this.LF.fullName)
+        SourcePattern := Format("{}\{}", RTrim(this._loop.source, "\\*"), this.LF.fullName)
         DestPattern := this.process_CustomKeywords(Format("{}\", RTrim(this._loop.matched_firstTargetPath, "")), this.get_contextKeywords())
-        this.History[A_Tab SourcePattern, ""] := DestPattern "*.*`r`n"
+        source_Dest := SourcePattern " → " DestPattern "*.*"
+        this.History := Format("[{1}]{6}{2}[{3}]{4}`r`n"
+            , this._loop.fileIndex
+            , " "
+            , source_Dest
+            , IsSet(Conflicts) ? Conflicts : ""
+            , JXON.Dump(this._loop.regEx)
+            , Format("T[`"{}`"]", this.Targets[Target].__parentKey)
+        )
+
         if !FileExist(DestPattern)
             try
                 DirCreate(DestPattern)
@@ -675,11 +701,40 @@ Class StoredTimestamp extends Watchdog_Base {
         }
     }
 
-    Dump(inputMap, path := this.__path) {
+    getMap() {
+        ; for k_Path, v_Files in this
+        ;     for k_Files, v_props in v_Files
+        ;         if Random(1, 2) = 1
+        ;             this[k_Path][k_Files].modified := A_sec "." A_MSec " - " A_Index
+
+        tempMap := Map()
+        for k_Path, v_Files in this
+        { tempFile := Map()
+            for k_Files, v_props in v_Files
+            { tempProp := Map()
+                value := unset
+                for k_prop, v_value in v_props.OwnProps()
+                    TempProp.Set(k_prop, value := v_value)
+                if TempProp.Count = 1
+                    tempFile.Set(k_Files, value)
+                else
+                    tempFile.Set(k_Files, tempProp)
+
+            }
+            tempMap.Set(k_path, tempFile)
+        }
+        ; tempPath.Set(k_path, tempFile.Set(k_Files, tempProp.Set(k_Prop, IsObject(v_value) ? "Object:" Type(v_value) : v_value)))
+        return tempMap
+    }
+
+    Dump(inputMap := this, path := this.__path) {
         tempMap := Map()
         for k_Path, v_Files in inputMap
+        { tempFile := Map()
             for k_Files, v_other in v_Files
-                tempMap.Set(k_path, Map(k_Files, inputMap[k_Path][k_Files].Value))
+                tempFile.Set(k_files, inputMap[k_Path][k_Files].Value)
+            tempMap.Set(k_path, tempFile)
+        }
         if !FileExist(path) {
             DisplayMap(tempMap, A_LineNumber, 1)
             throw ValueError(Format("There's no valid path to dump values in {}", Type(this)), , path)
