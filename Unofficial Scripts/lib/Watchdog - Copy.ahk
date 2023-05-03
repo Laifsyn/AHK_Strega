@@ -21,16 +21,53 @@ class Watchdog_Base extends Map {
         }
     }
 
-    CloneMap(InputMap) { ; Still experimenting if it works
+    cloneMap(InputMap) { ; Still experimenting if it works
         Val := InputMap.Clone()
         { for k, v in Val
             {
                 if (v is Object)
-                    val[k] := this.CloneMap(v)
+                    val[k] := this.cloneMap(v)
             } }
         return Val
     }
-
+    Dump(stringText, path, encoding := this._encoding) {
+        FileOpen(path, 0x2, encoding).Write(stringText)
+    }
+    
+    getMap(Input, validProps := ["Value"], level := 1, cap := 10) {
+        tempMap := Map()
+        if Input is Map
+        {
+            For k, v in Input ; Gives priority to Map's data.
+            {
+                If (isObj := IsObject(v)) && (level < cap)
+                    v := this.getMap(v, validProps, level + 1)
+                else if level >= cap && isObj
+                    v := Type(v)
+                tempMap.Set(k, v)
+            }
+        }
+        else
+            for prop, v in Input.OwnProps()
+            {
+                If (isObj := IsObject(v)) && (level < cap)
+                    v := this.getMap(v, validProps, level + 1)
+                else if (level >= cap && isObj)
+                    v := Type(v)
+                if (validProps = "All")
+                    tempMap.Set(prop, v)
+                Else
+                    for validName in validProps
+                        if (prop = validName)
+                        {
+                            if validProps.Length = 1
+                                tempMap := v
+                            else
+                                tempMap.Set(prop, v)
+                        }
+            }
+        return tempMap
+    }
     InQuote(Input, chars := "`"") => chars Input chars
 
     LogFormat() {
@@ -115,13 +152,15 @@ class Watchdog_Base extends Map {
         if Path is file
             JsonString := Path.read()
                 , Path.Close()
-        else if Type = "File"
+        else if Path is Map
+            Return Path
+        else if Type = "File" or "Path"
             JsonString := fileread(Path, encoding)
                 , this.DefineProp("__path", { Value: Path }) ; It means that this.__path stores the string path that was used to retrieve the file.
         else if Type = "Text"
             JsonString := Path
         else
-            throw ValueError("No matching data? Expects a path or string, but registered " Type, Type(this))
+            throw ValueError("No matching data? Expects a path, Map string, but registered " Type, Type(this))
         return JXON.Load(JsonString)
     }
 }
@@ -202,8 +241,9 @@ Class TargetFile extends Watchdog_Base {
             For Val in A_TargetValues {
                 if RegExMatch(Val, "r/(.*)/(.*)", &SubPat)
                 {
-                    msgbox "R:>" SubPat[2] "<"
-                    RegEx.Push({RegEx:SubPat[1], Replace:SubPat[2]})
+                    RegEx.Push(SubPat[1])
+                    ; msgbox "R:>" SubPat[2] "<"
+                    ; RegEx.Push({ RegEx: SubPat[1], Replace: SubPat[2] })
                     continue
                 }
                 temp .= val "|"
@@ -343,7 +383,7 @@ Class WatchFile Extends Watchdog_Base {
 Class Strega_Watcher extends Watchdog_Base {
     History_CountThreshold := 500
     _encoding := "UTF-8"
-    __New(PathsObj, TargetObj, objStoredTimestamp := StoredTimestamp()) {
+    __New(PathsObj, TargetObj, fileDataWrapper := Wrapper_StoredTimestamp()) {
         this.DefineProp("startUp", { Value: A_Now })
             , this.DefineProp("Count", { Value: { History: 0 } })
             ; , this.DefineProp("Watchers", { Value: PathsObj })
@@ -352,7 +392,8 @@ Class Strega_Watcher extends Watchdog_Base {
             , this.DefineProp("Watchers", { Value: PathsObj.Paths })
             , this.DefineProp("Targets", { Value: TargetObj.Targets })
             , this.DefineProp("Class", { Value: { watcher: PathsObj, target: TargetObj } })
-            , this.DefineProp("storedTimestamp", { Value: objStoredTimestamp })
+            , this.DefineProp("Wrapper_Ts", { Value: fileDataWrapper })
+            , this.DefineProp("storedTimestamp", { Value: fileDataWrapper[fileDataWrapper.TimestampWrapper] })
             , this.DefineProp("Ticks", { Value: Object() })
 
         return this
@@ -456,9 +497,10 @@ Class Strega_Watcher extends Watchdog_Base {
                 , (this._loop.matchedFiles > 0) ? this.History[, ""] := "`r`n" : ""
         }
         text := ""
+        DisplayMap(this.getMap(this.storedTimestamp), A_LineNumber, 1)
         if true
         { for key, val in this.storedTimestamp.clone()
-            for key2, val2 in val
+            for key2, val2 in val.clone()
                 text .= Format("{}{} = {}`r`n", rTrim(key, '* '), key2, val2.Value)
             SetListVars(text "`r`n" this.History "`r`n`r`n" Round(totalTime, 2) "ms `r`n" watcherTicks)
             ; msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
@@ -658,5 +700,3 @@ Class Strega_Watcher extends Watchdog_Base {
     }
 
 }
-
-
