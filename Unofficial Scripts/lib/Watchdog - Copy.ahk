@@ -1,12 +1,5 @@
-/* Todo list
--Finish S_getOrCreate_TimeMark()
-	Needs to store a file mark for the file in question
--Create a LogFile for when a file is succesfully moved
-
-
-
-*/
 #Requires AutoHotkey v2.0
+#Include <StoredTimestamp>
 
 class Watchdog_Base extends Map {
     _encoding := "UTF-8"
