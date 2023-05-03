@@ -1,11 +1,13 @@
 Class StoredTimestamp extends Watchdog_Base {
-    __New(Wrapper, InputMap := "") {
-        this.DefineProp("Wrapper", { Value: Wrapper })
-        this.DefineProp("__path", { Value: Wrapper.__path })
-        this.DefineProp("__fileLastModified", { Value: Wrapper.__fileLastModified })
-        if (InputMap = "") ; this is for in case there's no data to load, so we skip all this below
+    __New(Path := "", type := "Text", encoding := this._encoding) {
+        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
+        if (Path = "") ; this is for in case there's no data stored, so we skip all this below
             return this
-        for k_Path, v_Files in InputMap
+        if FileExist(Path)
+            this.DefineProp("__path", { Value: Path })
+        this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
+            , JsonMap := this.transformString(this.__path, Type, encoding)
+        for k_Path, v_Files in JsonMap
             for k_Files, v_storedTimeStamp in v_Files
                 this[k_Path] := StoredTimestamp.File(k_Files, {
                     Value: A_Now,
@@ -32,6 +34,11 @@ Class StoredTimestamp extends Watchdog_Base {
     }
 
     getMap() {
+        ; for k_Path, v_Files in this
+        ;     for k_Files, v_props in v_Files
+        ;         if Random(1, 2) = 1
+        ;             this[k_Path][k_Files].modified := A_sec "." A_MSec " - " A_Index
+
         tempMap := Map()
         for k_Path, v_Files in this
         { tempFile := Map()
@@ -41,16 +48,34 @@ Class StoredTimestamp extends Watchdog_Base {
                 for k_prop, v_value in v_props.OwnProps()
                     TempProp.Set(k_prop, value := v_value)
                 else
-                    value := "Empty"
+                    value:="Empty"
                 if TempProp.Count > 1
                     tempFile.Set(k_Files, tempProp)
                 else
                     tempFile.Set(k_Files, value)
+
             }
             tempMap.Set(k_path, tempFile)
         }
+        ; tempPath.Set(k_path, tempFile.Set(k_Files, tempProp.Set(k_Prop, IsObject(v_value) ? "Object:" Type(v_value) : v_value)))
         return tempMap
     }
+
+    Dump(inputMap := this, path := this.__path) {
+        tempMap := Map()
+        for k_Path, v_Files in inputMap
+        { tempFile := Map()
+            for k_Files, v_other in v_Files
+                tempFile.Set(k_files, inputMap[k_Path][k_Files].Value)
+            tempMap.Set(k_path, tempFile)
+        }
+        if !FileExist(path) {
+            DisplayMap(tempMap, A_LineNumber, 1)
+            throw ValueError(Format("There's no valid path to dump values in {}", Type(this)), , path)
+        } else DisplayMap(tempMap, A_LineNumber, 1)
+        FileOpen(path, 0x1, this._encoding).Write(JXON.dump(tempMap, 1))
+    }
+    ; { Inner Classes
 
     Class File extends Map {
 
@@ -69,55 +94,5 @@ Class StoredTimestamp extends Watchdog_Base {
             }
         }
     }
-}
-
-Class Wrapper_StoredTimestamp extends Watchdog_Base {
-    TimestampWrapper := "StoredTimestamp"
-
-    __New(Path := "", type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
-        this.DefineProp("__fileLastModified", { Value: 0 })
-        if (Path = "") ; this is for in case there's no data to load, so we skip all this below
-            return this
-        if FileExist(Path)
-            this.DefineProp("__path", { Value: Path })
-        this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
-            , JsonMap := this.transformString(this.__path, Type, encoding)
-        for wrapperKey, data in JsonMap
-            this[wrapperKey] := data
-        return this
-    }
-
-    __Item[keyName] {
-        set {
-            if keyName = this.TimestampWrapper
-            {
-                if !(value is Map)
-                    Throw ValueError(Format("{}[{}] expects a Map object, but got {} instead!", Type(this), keyName, Type(Value)), , Type(Value))
-                if Value is StoredTimestamp
-                { super[keyName] := Value
-                return
-            }
-            super[keyName] := StoredTimestamp(this, value)
-            return
-        }
-        super[keyName] := Value
-    }
-    get {
-        if (keyName = this.TimestampWrapper) && !(this.Has(keyName))
-            temp := StoredTimestamp(this, "")
-                , this[keyName] := temp
-        return super[keyName]
-    }
-}
-
-Dump(mapToDump := this, path := this.__path, encoding := this._encoding, padding := 1) {
-    tempMap := Map()
-    For _, v in mapToDump
-        v := this.getMap(v, ["Value"]), tempMap.Set(_, v)
-    myString := JXON.Dump(tempMap, padding)
-    SetListVars(myString, 1, A_LineNumber)
-    super.Dump(myString, path, encoding)
-}
 
 }
