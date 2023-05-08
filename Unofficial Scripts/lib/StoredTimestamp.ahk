@@ -1,17 +1,21 @@
 Class StoredTimestamp extends Watchdog_Base {
+    CaseSense := "Off"
     __New(Wrapper, InputMap := "") {
-        this.DefineProp("Wrapper", { Value: Wrapper })
+        this.DefineProp("__parent", { Value: Wrapper })
         this.DefineProp("__path", { Value: Wrapper.__path })
         this.DefineProp("__fileLastModified", { Value: Wrapper.__fileLastModified })
         if (InputMap = "") ; this is for in case there's no data to load, so we skip all this below
             return this
+
         for k_Path, v_Files in InputMap
             for k_Files, v_storedTimeStamp in v_Files
-                this[k_Path] := StoredTimestamp.File(k_Files, {
-                    Value: A_Now,
-                    stored: v_storedTimeStamp,
-                    lastModified: this.__fileLastModified
-                })
+                If FileExist(k_Path "\" k_Files)
+                    this[k_Path].push(k_Files, {
+                        Value: v_storedTimeStamp,
+                        stored: v_storedTimeStamp,
+                        lastModified: this.__fileLastModified
+                    })
+        DisplayMap(this.__parent.getMap(this, "All"), A_LineNumber, 1)
         return this
     }
     __Item[keyName] {
@@ -30,6 +34,8 @@ Class StoredTimestamp extends Watchdog_Base {
             super[keyName] := Value
         }
     }
+
+    Dump() => this.__parent.Dump() ; If it makes sense: If you dump the child, then you want to dump the whole wrapper.
 
     getMap() {
         tempMap := Map()
@@ -53,7 +59,7 @@ Class StoredTimestamp extends Watchdog_Base {
     }
 
     Class File extends Map {
-
+        CaseSense := "Off"
         __Item[keyName] {
             get {
                 if !this.Has(keyName)
@@ -68,14 +74,19 @@ Class StoredTimestamp extends Watchdog_Base {
                 super[keyName] := this[keyName]
             }
         }
+
+        Push(key, Data) {
+            this.Set(key, Data)
+            return this
+        }
     }
 }
 
-Class Wrapper_StoredTimestamp extends Watchdog_Base {
+Class Wrapper_FileData extends Watchdog_Base {
     TimestampWrapper := "StoredTimestamp"
-
+    _encoding := "UTF-8"
     __New(Path := "", type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Timestamps.json" })
+        this.DefineProp("__path", { Value: A_WorkingDir "\configs\Timestamps.json" })
         this.DefineProp("__fileLastModified", { Value: 0 })
         if (Path = "") ; this is for in case there's no data to load, so we skip all this below
             return this
@@ -83,6 +94,7 @@ Class Wrapper_StoredTimestamp extends Watchdog_Base {
             this.DefineProp("__path", { Value: Path })
         this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
             , JsonMap := this.transformString(this.__path, Type, encoding)
+            , this.DefineProp("storedFile", { Value: JsonMap })
         for wrapperKey, data in JsonMap
             this[wrapperKey] := data
         return this
@@ -112,12 +124,15 @@ Class Wrapper_StoredTimestamp extends Watchdog_Base {
 }
 
 Dump(mapToDump := this, path := this.__path, encoding := this._encoding, padding := 1) {
-    tempMap := Map()
-    For _, v in mapToDump
-        v := this.getMap(v, ["Value"]), tempMap.Set(_, v)
+    Static lastCall := A_Now
+    tempMap := this.getMap(mapToDump, ["Value"])
     myString := JXON.Dump(tempMap, padding)
-    SetListVars(myString, 1, A_LineNumber)
+    if (JXON.Dump(this.storedFile, padding) = myString) and (DateDiff(lastCall, A_Now, "s") > 300)
+        return { result: False, timestamp: lastCall }
+    lastCall := A_Now
     super.Dump(myString, path, encoding)
+
+    return { result: False, timestamp: lastCall }
 }
 
 }

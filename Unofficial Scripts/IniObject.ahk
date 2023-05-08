@@ -3,6 +3,7 @@
 #Include <JXON>
 #Include <UDF>
 #Include <Watchdog - Copy>
+SetWorkingDir A_ScriptDir
 
 
 

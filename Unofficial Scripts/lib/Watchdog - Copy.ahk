@@ -21,6 +21,8 @@ class Watchdog_Base extends Map {
         }
     }
 
+    Append(stringText, path, encoding := this._encoding) => FileOpen(path, 0x2, encoding).Write(stringText)
+
     cloneMap(InputMap) { ; Still experimenting if it works
         Val := InputMap.Clone()
         { for k, v in Val
@@ -30,10 +32,13 @@ class Watchdog_Base extends Map {
             } }
         return Val
     }
+
     Dump(stringText, path, encoding := this._encoding) {
-        FileOpen(path, 0x2, encoding).Write(stringText)
+        myFile := FileOpen(path, 0x2, encoding)
+            , myFile.Seek(0, 0), myFile.Write(stringText), myFile.Length:= myFile.Pos
+
     }
-    
+
     getMap(Input, validProps := ["Value"], level := 1, cap := 10) {
         tempMap := Map()
         if Input is Map
@@ -163,11 +168,20 @@ class Watchdog_Base extends Map {
             throw ValueError("No matching data? Expects a path, Map string, but registered " Type, Type(this))
         return JXON.Load(JsonString)
     }
+    hasChanges {
+        set => this.__hasChanges:=this.hasChanges + (!!Value)
+        get{
+            try 
+                return this.__hasChanges
+            catch
+                return 0
+        }
+    }
 }
 
 Class TargetFile extends Watchdog_Base {
     __New(Path, type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Targets.json" })
+        this.DefineProp("__path", { Value: A_WorkingDir "\configs\Targets.json" })
         if FileExist(Path)
             this.DefineProp("__path", { Value: Path })
         if FileExist(this.__path)
@@ -272,7 +286,7 @@ Class TargetFile extends Watchdog_Base {
 
 Class WatchFile Extends Watchdog_Base {
     __New(Path, Type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: A_ScriptDir "\configs\Paths.json" }) ; By defining a default path, I can initialize an empty instance and be able to store the changes
+        this.DefineProp("__path", { Value: A_WorkingDir "\configs\Paths.json" }) ; By defining a default path, I can initialize an empty instance and be able to store the changes
         if FileExist(Path)
             this.DefineProp("__path", { Value: Path })
         if FileExist(this.__path)
@@ -383,7 +397,7 @@ Class WatchFile Extends Watchdog_Base {
 Class Strega_Watcher extends Watchdog_Base {
     History_CountThreshold := 500
     _encoding := "UTF-8"
-    __New(PathsObj, TargetObj, fileDataWrapper := Wrapper_StoredTimestamp()) {
+    __New(PathsObj, TargetObj, fileDataWrapper := Wrapper_FileData(A_WorkingDir "\configs\Timestamps.json")) {
         this.DefineProp("startUp", { Value: A_Now })
             , this.DefineProp("Count", { Value: { History: 0 } })
             ; , this.DefineProp("Watchers", { Value: PathsObj })
@@ -497,7 +511,9 @@ Class Strega_Watcher extends Watchdog_Base {
                 , (this._loop.matchedFiles > 0) ? this.History[, ""] := "`r`n" : ""
         }
         text := ""
-        DisplayMap(this.getMap(this.storedTimestamp), A_LineNumber, 1)
+        ; DisplayMap(this.getMap(this.storedTimestamp), A_LineNumber, 1)
+        ; DisplayMap(this.getMap(this.Wrapper_Ts), A_LineNumber, 2)
+        this.Wrapper_Ts.Dump()
         if true
         { for key, val in this.storedTimestamp.clone()
             for key2, val2 in val.clone()
@@ -539,9 +555,9 @@ Class Strega_Watcher extends Watchdog_Base {
                     this._loop.regex_matches := match.Length,
                     this._loop.regEx := match
                     If IsSet(digitalTimeStamp)
-                        this.storedTimestamp[this._loop.source].Delete(this.LF.fullName)
+                        this.storedTimestamp[this.LF.path].Delete(this.LF.fullName)
                     else
-                        this.storedTimestamp[this._loop.source][this.LF.fullName] := A_Now
+                        this.storedTimestamp[this.LF.path][this.LF.fullName] := A_Now
                     if IsSet(hasTimeStamp) and !hasTimeStamp
                         return False
                 }
@@ -554,9 +570,9 @@ Class Strega_Watcher extends Watchdog_Base {
         return !!this._loop.conflicts.Length
     }
 
-    hasTimestamp() => this.storedTimestamp.Has(this.LF.path) And this.storedTimestamp[this.__loop.source].Has(this.LF.fullName)
+    hasTimestamp() => this.storedTimestamp.Has(this.LF.path) And this.storedTimestamp[this.LF.path].Has(this.LF.fullName)
 
-    get_StoredAge() => this.storedTimestamp[this.__loop.source][this.LF.fullName].Value
+    get_StoredAge() => this.storedTimestamp[this.LF.path][this.LF.fullName].Value
 
     process_StoredAge() {
     }
@@ -658,7 +674,7 @@ Class Strega_Watcher extends Watchdog_Base {
         ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
         this.DefineProp("LF", { value: fileObj })
     }
-    Dump(content, file := A_ScriptDir "\logs.txt", Encryption := this._encoding, overwrite := 0) { ; Dumps history into the file
+    Dump(content, file := A_WorkingDir "\logs.txt", Encryption := this._encoding, overwrite := 0) { ; Dumps history into the file
         ;* Unfinished
     }
     procedureIndex {
