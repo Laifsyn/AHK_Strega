@@ -35,7 +35,7 @@ class Watchdog_Base extends Map {
 
     Dump(stringText, path, encoding := this._encoding) {
         myFile := FileOpen(path, 0x2, encoding)
-            , myFile.Seek(0, 0), myFile.Write(stringText), myFile.Length:= myFile.Pos
+            , myFile.Seek(0, 0), myFile.Write(stringText), myFile.Length := myFile.Pos
 
     }
 
@@ -169,9 +169,9 @@ class Watchdog_Base extends Map {
         return JXON.Load(JsonString)
     }
     hasChanges {
-        set => this.__hasChanges:=this.hasChanges + (!!Value)
-        get{
-            try 
+        set => this.__hasChanges := this.hasChanges + (!!Value)
+        get {
+            try
                 return this.__hasChanges
             catch
                 return 0
@@ -517,7 +517,7 @@ Class Strega_Watcher extends Watchdog_Base {
         if true
         { for key, val in this.storedTimestamp.clone()
             for key2, val2 in val.clone()
-                text .= Format("{}{} = {}`r`n", rTrim(key, '* '), key2, val2.Value)
+                text .= Format("{}\{} = {}`r`n", key, key2, val2.Value)
             SetListVars(text "`r`n" this.History "`r`n`r`n" Round(totalTime, 2) "ms `r`n" watcherTicks)
             ; msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
         }

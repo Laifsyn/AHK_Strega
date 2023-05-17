@@ -21,6 +21,7 @@ Class StoredTimestamp extends Watchdog_Base {
     __Item[keyName] {
         get {
             keyName := Trim(keyName, " \")
+            ; These trims should stay for consistency sakes. If you use the path pieces, you should add by yourself the inverted slash
             if this.Has(keyName)
                 return super[keyName]
             newInst := StoredTimestamp.File().DefineProp("_pathName", { Value: KeyName }) ; * If the key didn't exist previously, it will create a key that contains an empty instance of StoredTimestamp.File
@@ -92,6 +93,8 @@ Class Wrapper_FileData extends Watchdog_Base {
             return this
         if FileExist(Path)
             this.DefineProp("__path", { Value: Path })
+        else
+            FileAppend("{}", this.__path, this._encoding) ; File doesn't exists? creates it.
         this.DefineProp("__fileLastModified", { Value: FileGetTime(this.__path, "M") })
             , JsonMap := this.transformString(this.__path, Type, encoding)
             , this.DefineProp("storedFile", { Value: JsonMap })
@@ -132,7 +135,7 @@ Dump(mapToDump := this, path := this.__path, encoding := this._encoding, padding
     lastCall := A_Now
     super.Dump(myString, path, encoding)
 
-    return { result: False, timestamp: lastCall }
+    return { result: True, timestamp: lastCall }
 }
 
 }
