@@ -1,8 +1,0 @@
-{
-    "SearchKeys" : ["jpg","png","tiff","psd"],
-    "Target" : "C:\\Macro\\Basic 1\\Images\\",
-    "Action" : "Move" ,
-    "Type" : "Filetype" ,
-    "SortByDate" : 0 ,
-    "CaseSensitive" : "false"
-    }
