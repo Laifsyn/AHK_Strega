@@ -1,0 +1,11 @@
+{
+    "Skip" : 0,
+    "Source" : [
+        "<Downloads>\\Carpeta_Prueba"
+    ],
+    "isPath" : true,
+    "TargetKeys" : ["vectors", "images"],
+    "Description" : "Path to Watch over",
+    "TimeUp": "1h",
+    "Age_asCountdown": 1
+    }

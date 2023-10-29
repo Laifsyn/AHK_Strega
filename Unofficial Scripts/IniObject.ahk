@@ -3,6 +3,10 @@
 #Include <JXON>
 #Include <UDF>
 #Include <Watchdog - Copy>
+SetWorkingDir A_ScriptDir
+
+
+
 
 msgbox A_UserName
 ; loop files A_Desktop "\*" , "F"

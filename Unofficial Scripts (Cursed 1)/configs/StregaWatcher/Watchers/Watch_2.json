@@ -1,0 +1,14 @@
+{
+    "Skip": 1,
+    "Source": [
+        "<A_Desktop>",
+        "C:\\users\\<A_UserName>\\Downloads\\"
+    ],
+    "isPath": true,
+    "TargetKeys": [
+        "2"
+    ],
+    "Description": "Path to Watch over",
+    "TimeUp": "15d8h",
+    "Age_asCountdown": 1
+}

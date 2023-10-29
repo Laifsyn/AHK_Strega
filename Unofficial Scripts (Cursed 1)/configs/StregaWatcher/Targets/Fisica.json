@@ -1,0 +1,10 @@
+{
+    "SearchKeys": [
+        "Fisica"
+    ],
+    "Target": "C:\\Macro\\Basic 1\\Test\\",
+    "Action": "Move",
+    "Type": "Keyword",
+    "SortByDate": 0,
+    "CaseSensitive": "false"
+}

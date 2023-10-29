@@ -1,505 +1,324 @@
-/* Todo list
--Finish S_getOrCreate_TimeMark()
-	Needs to store a file mark for the file in question
--Create a LogFile for when a file is succesfully moved
-
-
-
-*/
 #Requires AutoHotkey v2.0
-
-class Watchdog_Base extends Map {
-    _encoding := "UTF-8"
-    CaseSense := "Off"
-    Summary[Line, Function := "", type := "INFO"] {
-        set {
-            Static Cycles := 0, Content := ""
-            Content .= Format("{1}({2})(Func.{3})({4}){5}`r`n", this.LogFormat(), Line, Function, Cycles, value)
-            this._Summary := value
-            if !Mod(Cycles, 50)
-                return
-            ; msgbox Content
-        }
-        get {
-            Try
-                return this._Summary
-            catch
-                return ""
-        }
-    }
-
-    CloneMap(InputMap) { ; Still experimenting if it works
-        Val := InputMap.Clone()
-        { for k, v in Val
-            {
-                if (v is Object)
-                    val[k] := this.CloneMap(v)
-            } }
-        return Val
-    }
-
-    InQuote(Input) => "`"" Input "`""
-
-    LogFormat() {
-        Return FormatTime(A_Now, "[HH:mm:ss." A_MSec "]")
-    }
-
-    mergeMap(InstRef, Map) { ;Shallow merge.
-        For k, v in Map
-            InstRef[k] := v
-    }
-
-    process_Keywords(Input, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)") {
-        While (Input ~= "i)<.*>")
-        {
-            Try
-            { RegExMatch(Input, "i)<(" SupportedKeyWords ")>", &SubPat)
-                , Input := RegExReplace(Input, "i)<(" SubPat[1] ")>", %SubPat[1]%)
-            }
-            catch ; Once there's no more matches, it stops iterating
-                Break
-        }
-        ; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
-        Return Input
-    }
-
-    process_CustomKeywords(Input, UDK) {
-        StartingPos := 1, KeyWords := Array()
-        While StartingPos := RegExMatch(Input, "i)<([^>\\]+)>", &SubPat, StartingPos) + 1
-        {
-            If !SubPat
-                break
-            KeyWords.Push(SubPat[1])
-        }
-        For Value in KeyWords {
-            if UDK.Has(Value)
-                Input := RegExReplace(Input, "i)<(" Value ")>", UDK[Value])
-            ; else
-            ;     throw ValueError("<" this.InQuote(Value) "> isn't a defined key", Type(this), Input)
-        }
-        ; msgbox "PropList" A_LineNumber  "`r`n" UDF.getPropsList(this) "`r`n" Input
-        Return Input
-    }
-
-    process_AddEnding(Input) { ;Adds the ending of the path. For File Loop, it always requires to you specificate what to iterate in the folder
-        if !(Input ~= "\\\*?$")
-            Input := Input "\"
-        if (Input ~= "\\$")
-            Input := Input "*"
-        return input
-    }
-
-    process_TimeString(Input) {
-        this.Set("TimeInfo", Map()) ;Call for a Set() so it doesn't call the __Item[] property
-            , this["TimeInfo"].CaseSense := "Off"
-        If IsNumber(Input) {
-            Time := 20000101 ;Arbitrary midnight of any date
-            time := DateAdd(time, Integer(Input), "Seconds")
-                ; msgbox Input//86400 "d" FormatTime(time, "H'h'mm'm's's'")
-                , this["TimeInfo"]["Days"] := Input // 86400
-                , this["TimeInfo"]["Hours"] := FormatTime(time, "H")
-                , this["TimeInfo"]["Minutes"] := FormatTime(time, "m")
-                , this["TimeInfo"]["Seconds"] := FormatTime(time, "s")  ;Enclosed in parentheses because auto formatter is funny at times
-            Return Input
-        }
-        ; this["TimeInfo"]["Months"] := (RegExMatch(Input, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0) ;Because I feel like it makes more sense for it to be up to days as the highest number
-        this["TimeInfo"]["Days"] := (RegExMatch(Input, "((?<Days>\d+)[Dd])", &Days) ? Days[2] : 0)
-            , this["TimeInfo"]["Hours"] := (RegExMatch(Input, "((?<Hours>\d+)[Hh])", &Hours) ? Hours[2] : 0)
-            , this["TimeInfo"]["Minutes"] := (RegExMatch(Input, "((?<Minutes>\d+)[m])", &Minutes) ? Minutes[2] : 0)
-            , this["TimeInfo"]["Seconds"] := (RegExMatch(Input, "((?<Seconds>\d+)[sS])", &Seconds) ? Seconds[2] : 0) ;Enclosed in parentheses because auto formatter is funny at times
-            , Input := this["TimeInfo"]["Days"] * 86400 + this["TimeInfo"]["Hours"] * 3600 + this["TimeInfo"]["Minutes"] * 60 + this["TimeInfo"]["Seconds"]
-        return Input
-    }
-    process_invalidKeywords(Input) => RegExReplace(Input, "i)(<|>)", "")
-
-    renameKey(baseObject, OldKey, NewKey) {
-        baseObject[NewKey] := baseObject[OldKey]
-            , baseObject.Delete(OldKey)
-    }
-
-    transformString(Path, Type, encoding) { ; To transform a string path into a possibly JSON String
-        if Path is file
-        {
-            JsonString := Path.read()
-            Try
-                Path.Close()
-            catch as E
-            {
-                msgbox(E.What)
-                return
-            }
-        }
-        else if Type = "File"
-            JsonString := fileread(Path, encoding)
-                , this.DefineProp("__path", { Value: Path })
-        else if Type = "Text"
-            JsonString := Path
-        else
-            throw ValueError("No matching data? Expects a path or string, but registered " Type, Type(this))
-        return JXON.Load(JsonString)
-    }
-}
-
-Class TargetFile extends Watchdog_Base {
-    __New(Path, type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
-            , this.mergeMap(this, JsonMap)
-            , this.Targets := TargetFile.Configs(this["Targets"], this) ; I will be able to keep an intact this["Targets"]
-    }
-
-    Class Configs extends Watchdog_Base {
-        __New(Configs, Parent) {
-            this.DefineProp("__parent", { Value: Parent })
-                , this.DefineProp("__original", { Value: Configs }) ; Stores a pointer to directly access the Original configs
-            for Key, A_Settings in Configs
-                this[key] := TargetFile.TargetPath(A_Settings, Key, this)
-            return this
-        }
-
-        __Item[KeyName] {
-            get {
-                if this.Has(KeyName)
-                    return super[KeyName] ;Changed to Super to avoid Infinite Recursion
-                return this[KeyName] := TargetFile.TargetPath("s", KeyName, this)
-            }
-        }
-    }
-    Class TargetPath Extends Watchdog_Base { ;; Auto Initialize a SubClass Instance in case there's the setting of a not defined Target Or Watcher
-        __New(InputSettings, parentKey, Parent) {
-            ; msgbox Watcher " " A_LineNumber
-            this.DefineProp("__parent", { Value: Parent })
-                , this.DefineProp("__parentKey", { Value: parentKey })
-                , this.DefineProp("__setting", { Value: InputSettings })
-            for Key, val in this.__setting
-                this[Key] := val
-            Return this
-        }
-
-        __Item[KeyName] {
-            set {
-                switch KeyName, 0 {
-                    case "SearchKeys":
-                        Val := Array()
-                        , Value := Value is Array ? Value : Array(Value)
-                        For _, v in Value {
-                            v := this.process_Keywords(v)
-                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
-                            Val.Push(v)
-                        }
-                        this.Targets := this.refine_Targets(this.__setting["Type"], Val*)
-                        Value := Val
-                    case "Target":
-                        v := Value
-                        , v := this.process_Keywords(v)
-                        , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
-                        , value := v
-                    default:
-                        If value is Object
-                        {
-                            err := ValueError(this.InQuote(this.__parentKey) "[" KeyName "] expects string, but got " Type(value), Type(this))
-                                , msgbox(UDF.ErrorFormat(err))
-                        }
-                }
-                Super[KeyName] := Value
-            }
-        }
-
-        refine_Targets(InputType, A_TargetValues*) { ; This is to convert Filetype/Keyword Keywords into a single RegEx if possible. This should solve cases when data is updated on the run
-            temp := "", RegEx := Array()
-
-            For Val in A_TargetValues {
-                if RegExMatch(Val, "r/(.*)/(.*)", &SubPat)
-                {
-                    RegEx.Push(SubPat[1])
-                    continue
-                }
-                temp .= val "|"
-            }
-            temp := "(" Trim(temp, "|") ")"
-            if RegEx.Length ;will replace >this.__setting["Type"]< so to store as a temporal value of the result type of the refinement
-                this.type := "Mixed"
-            else
-                this.type := InputType
-            If (this.Type = "Mixed") { ; it matters to know if it's mixed, so It can work with A_LoopFileName without issues
-                switch InputType, 0 { ; Case Insensitive - Checks for the original Expected InputType
-                    case "Filetype":
-                        temp := "iS)\." temp "$"
-                    case "Keyword":
-                        temp := "iS)" temp "(?=.*\.[^\.]+)$"
-                    default:
-                        throw ValueError("Unknown Type! Expects `"Filetype`" or `"Keyword`"", Type(this), "TargetKey [" this.__parentKey "]:=" this.InQuote(InputType))
-                } }
-            else
-                temp := "iS)" temp
-            RegEx.InsertAt(1, temp)
-            return RegEx
-        }
-    }
-}
-
-Class WatchFile Extends Watchdog_Base {
-    __New(Path, Type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
-            , this.mergeMap(this, JsonMap)
-            , WatcherConfigs := this["WatcherConfigs"]
-            , this.Paths := WatchFile.Configs(this[WatcherConfigs], this) ; I will be able to keep an intact this["Paths"]
-
-        ; For Watcher, A_Settings in this.Paths { ; Create a shallow Clone because it seems that deleting the key mess up with the Enumeration
-
-        ;     Temp := WatchFile.Configs(A_Settings, Watcher, this)
-        ;         , this.Summary[A_LineNumber, A_ThisFunc] := Format("{}({})")
-        ;         , Temp.DeleteProp("Summarys")
-        ;         , this.Paths[Watcher] := Temp
-        ; }
-    }
-
-    Class Configs extends Watchdog_Base {
-        __New(Configs, Parent) {
-            this.DefineProp("__parent", { Value: Parent })
-                , this.DefineProp("__original", { Value: Configs }) ; Stores a pointer to directly access the Original configs
-            toDelete := []
-            for Key, A_Settings in Configs
-            {
-                If !!(A_Settings["Skip"])
-                    Continue
-                Temp := WatchFile.WatchPath(A_Settings, Key, this)
-                if !Temp["Source"].Length
-                    Continue
-                this[key] := Temp
-
-            }
-            return this
-        }
-
-        __Item[KeyName] {
-            set {
-                super[KeyName] := Value
-            }
-            get {
-                if this.Has(KeyName)
-                    return super[KeyName] ;Has to use Super otherwise it will infinitely recurse.
-                return this[KeyName] := WatchFile.WatchPath(Map(), KeyName, this)
-            }
-        }
-    }
-    Class WatchPath Extends Watchdog_Base { ; Wrapper to process the watcher's parameters
-        CaseSense := 0
-
-        __New(InputSettings, parentKey, Parent) {
-            ; msgbox Watcher " " A_LineNumber
-            this.DefineProp("__parent", { Value: Parent })
-                , this.DefineProp("__parentKey", { Value: parentKey })
-            for Key, val in InputSettings
-                this[Key] := val
-
-            Return this
-        }
-
-        __Item[KeyName] {
-            set {
-                switch KeyName, 0 {
-                    case "Source":
-                        Val := Array()
-                        , Value := Value is Array ? Value : Array(Value)
-                        For _, v in Value {
-                            if InStr(v, ";", , (-StrLen(v)))
-                                continue
-                            v := this.process_Keywords(v)
-                                , oldv := v
-                                , v := this.process_CustomKeywords(v, this.__parent.__parent["UserDefined"])
-                                , v := this.process_invalidKeywords(v) ; It means that "C:\<sometext\*>" → "C:\sometext\*"
-                                , v := this.process_AddEnding(v)
-                            if FileExist(Trim(v, "*\")) ;Trim it because "Path\*" can be wonky
-                                Val.Push(v)
-                            else
-                                throw ValueError("File path doesn't exists! " v "`r`nYou can add a ';' at the start to ignore the key",
-                                    , Format("Watcher[`"{}`"](Item no.{}):={}", this.__parentKey, A_Index, oldv))
-                            ; msgbox v " " A_LineNumber
-                        }
-                        Value := Val
-                    case "TargetKeys":
-                        Val := Array()
-                        , Value := Value is Array ? Value : Array(Value)
-                        For _, v in Value {
-                            Val.Push(v)
-                        }
-                        Value := Val
-                    case "TimeUp":
-                        Value := this.process_TimeString(Value)
-                    default:
-                        If value is Object
-                        {
-                            err := ValueError(this.__parentKey "[" KeyName "] expects string, but got " Type(value), Type(this))
-                                , msgbox(UDF.ErrorFormat(err))
-                        }
-                }
-                Super[KeyName] := Value
-            }
-        }
-    }
-
-}
+#Include <StoredTimestamp>
+#Include <Structs\A_LoopFields>
+#Include <Classes\SendFile>
 
 Class Strega_Watcher {
     History_CountThreshold := 500
-    __New(PathsObj, TargetObj) {
+    _encoding := "UTF-8"
+    __New(watcher_path, targets_path, timestamp_path := StoredTimestamp(A_ScriptDir "\configs\Timestamps.json", this)) {
         this.DefineProp("startUp", { Value: A_Now })
-            , this.DefineProp("Count", { Value: { History: 0 } })
-            ; , this.DefineProp("Watchers", { Value: PathsObj })
-            ; , this.DefineProp("Targets", { Value: TargetObj })
-            ; In case I need a pointer to the original Obj. Otherwise this should suffice
-            , this.DefineProp("Watchers", { Value: PathsObj.Paths })
-            , this.DefineProp("Targets", { Value: TargetObj.Targets })
+            , this.DefineProp("Watchers", { Value: WatchFile(watcher_path) })
+            , this.DefineProp("Targets", { Value: TargetFile(targets_path) })
+            , this.StoredTimestamp := timestamp_path is string ? StoredTimestamp(timestamp_path, this) : timestamp_path
             , this.DefineProp("Ticks", { Value: Object() })
-
+            , this.loop := Object()
+            , this.SweepConfigs()
         return this
     }
-
-    QPC(Counter := "", Decimals := 2) {
-        If Counter = ""
-        {
-            DllCall("QueryPerformanceFrequency", "Int64*", &freq := 0)
-                , this.freq := freq
-                , DllCall("QueryPerformanceCounter", "Int64*", &Counter := 0)
-            return Counter
+    /**
+     * Checks if the watchers TargetKeys are Valid
+     */
+    SweepConfigs() {
+        this._Sweep_WatchersTargets()
+        this._Sweep_Paths()
+    }
+    /**
+     * Sweeps the Watcher's Data to check for invalid Target Entries
+     */
+    _Sweep_WatchersTargets() {
+        targets := this.Targets["Settings"]
+        unexistent_keys := []
+        for watcher_namespace, Settings in this.Watchers["Settings"] {
+            for _index, target_key in Settings["TargetKeys"] {
+                if !targets.has(target_key) {
+                    unexistent_keys.Push({ File: Settings.namespace, TargetKey: target_key, FileFullPath: Settings.search_path })
+                }
+            }
         }
-        DllCall("QueryPerformanceCounter", "Int64*", &CounterAfter := 0)
-        return Round((CounterAfter - Counter) / this.freq * 1000, Decimals)
+        if unexistent_keys.Length {
+            text := ""
+            for index, item in unexistent_keys
+                text .= Format("
+            (join`r`n
+                Unknown Target Key No. {} in "{}.json"
+                    Target Key: "{}"
+                    Absolute Path: "{}"
+                    `r`n
+            )", index, item.File, item.issue_item, item.FileFullPath)
+            ;End of formatting
+            SetListVars("Unknown Target Keys has been detected. Please either delete invalid Keys, or create their Target Config`r`n" text)
+            if unexistent_keys.Length = 1
+                throw Error(Format("Unknown Target key in {}", unexistent_keys[1].File), , unexistent_keys[1].TargetKey)
+            else
+                throw Error(Format("Unknown Target keys ({} Unknown Targets)", unexistent_keys.Length))
+        }
     }
 
-    LogFormat(Detail, Result, InfoType, Count, Time := A_Now) => Format("[{1}]{4}({2}){3}",
-        Format("{}.{}", FormatTime(Time, "HH:mm:ss"), A_MSec),
-        InfoType,
-        ResultInfo := Detail = "" ? Result : Detail " ≡ " Result,
-        !!Count ? Format("[{}]", Count) : ""
-        )
+    /**
+     * Sweeps for the Watcher's paths to check if they exists
+     */
+    _Sweep_Paths() {
+        targets := this.Targets["Settings"]
+            , Issues := Map()
+            , Issues.Length := 0
+        for _, Settings in this.Watchers["Settings"] {
+            for _idx, path in Settings["Source"] {
+                if !this._Sweep_Paths_FileExist(Settings, &path) {
+                    if !Issues.Has(Settings.search_path)
+                        Issues[Settings.search_path] := []
+                    Issues[Settings.search_path].push(path), Issues.Length += 1
+                }
+            }
+        }
+        if Issues.Length {
+            text := ""
+            paths_dont_exist := ""
+            for full_path, items in Issues {
+                text .= Format('`r`n{}-)Unknown Path in " {} "`r`n', A_index, full_path)
 
-    FormatSeconds(Input) {
-        Time := 20000101 ;Arbitrary midnight of any date
-            , Time := DateAdd(Time, Integer(Input), "Seconds")
-        return (Input // 86400) " Days" FormatTime(time, " HH:mm:ss")
+                for index, item in items {
+                    if items.Length <= 1
+                        text .= Format("...... {}`r`n", item)
+                    else
+                        text .= Format("...... {}-) {}`r`n", A_Index, item)
+                    paths_dont_exist .= Format("...... {}`r`n", item)
+                }
+            }
+            SetListVars("Undefined Paths has been detected. Please either delete invalid Paths, or validate them`r`n" text "`r`nSummary:`r`n" paths_dont_exist)
+            if Issues.Length = 1
+                throw Error(Format("Unknown path in {}", Issues[1].File), , Issues[1].TargetKey)
+            else
+                throw Error(Format("Unknown paths ({} items)", "Issues found: " Issues.Length))
+        }
     }
+    /**
+     * 
+     */
+    _Sweep_Paths_FileExist(SettingsObject, &path) {
+        original := ""
+        path := RegExReplace(path, "\\+", "\")
+        if (SettingsObject.UnprocessedKeywords.Length) && ((result := RegExReplace(path, "<.*", "")) != path)
+            original := Format('", original: "{}', path), path := result
+        path := Trim(path, "*\")
+        check_path := path
+        path := path original
+        return FileExist(check_path)
+    }
+
     doProcedure() {
+        this_procedure_start_time := A_TickCount
         this.procedureIndex += 1
         ; DisplayMap(this.Watchers, A_LineNumber)
         ; DisplayMap(this.Targets, A_LineNumber)
         ; * This will iterate over Paths.json[Paths].Watchers→Settings
         VarSetStrCapacity(&watcherTicks, 10000), totalTime := 0
-        for Watcher, Settings in this.Watchers
-        {
+        for watcher_namespace, Settings in this.Watchers["settings"] {
+            this.watcher := Settings
+                , this.loop.namespace := Settings.namespace
+                , this.loop.TimeUp := Settings["TimeUp"]
 
-            ; ; * Due to the existence of _Watcher.Value.__parentKey I might not need the use of _Watcher.KeyName
-            this.DefineProp("_Watcher", { Value: { KeyName: Watcher, Value: Settings } })
-                , last_fileIndex := 0, last_sourceIndex := 0
-            ; displaymap(this._Watcher.Value, A_LineNumber, 1)
-            ; DisplayMap(Settings, A_LineNumber)
-            ; * This will iterate over Paths.json["Paths"][Watchers]["Source"]→Array Values  ( Source Paths)
-            for Source in this._Watcher.Value["Source"]
-            {
+            for source_index, source_path in Settings["Source"] {
 
-                this.DefineProp("_loop", { value: { source: Source,
-                    sourceIndex: A_Index,
-                    conflicts: "",
-                    fileIndex: "",
-                    matchedFiles: 0,
-                    matchedFiles_First: ""
-                } }) ; * a way to access the current Source Path I'm iterating
-
-                this.DefineProp("_loopDesc", { value: { source: "Access the current Iterating Source Path",
-                    sourceIndex: "This leaves access to the current Source Index ",
-                    conflicts: "This will help to find in case there're multiple target keys that matches the item. only if (conflicts.Length>1) is there a conflict",
-                    fileIndex: "Access the current Index of the loop file",
-                    matchedFiles: "Access the current amount of matched files in the iteration",
-                    matchedFiles_First: "This will store the first match of the file"
-                } }) ; Descriptions of this._loop's properties
-                    , this.Ticks.Folder := this.QPC()
-                loop files this._loop.source, "F"
+                if Settings.UnprocessedKeywords.Length and IsInList(A_Index, Settings.UnprocessedKeywords) {
+                    Settings.ConvertKeyword(&source_path, settings.parent["UserDefined"], Array())
+                }
+                ; if !FileExist(source_path) {
+                ;     throw Error(Format('Unexistent path in "{}"', this.watcher.namespace),,source_path)
+                ; }
+                this.loop.source := source_path
+                    , this.loop.sourceIndex := source_index
+                    , this.loop.matchedFiles := 0 ; Counts the amount of files that matches the search keys
+                ; This searches for all the files in the source.
+                mark_time := A_TickCount
+                loop files this.loop.source, "F"
                 {
-                    this._loop.fileIndex := A_Index ; * So I can get access to the current file index that's in iteration
-                        , this.store_FileInstance() ; * this is to store the Loop Files variables into an object
-                    If this.do_fileMatch()
-                        this.proceed_Send()
-                    last_fileIndex += 1
+                    this.loop.fileIndex := A_Index ; * helps enumerate the current file it's iterating over
+                        , A_LoopFile := A_LoopFields(this.storeA_LoopFile()) ; * Stores A_LoppFile variants
+
+
+                    If this.watcher["Age_asCountdown"] &&
+                        has_timestamp := this.hasTimestamp(A_LoopFile.path, A_LoopFile.fullName, this.StoredTimestamp)
+                        If DateDiff(A_Now, this.get_timestamp_from(this.StoredTimestamp, A_LoopFile.fullPath), "s") <= this.watcher["TimeUp"]
+                            continue
+                    ; else
+                    ;      MsgBox("hey, hey. You got something" Format("}{} <= {}", DateDiff(A_Now, this.get_timestamp_from(this.StoredTimestamp, A_LoopFile.fullPath), "s"), this.watcher["TimeUp"]))
+
+                    matching_target_key := unset
+                    for target_key in this.Watcher["TargetKeys"] {
+                        matching_target_key := target_key
+                        if (new_path := this.file_matches_target_config((target := this.Targets["settings"][target_key]), A_LoopFile))
+                            break ; We got a new_path, so we stop searching
+                    }
+                    if !new_path
+                        continue
+                    if this.watcher["Age_asCountdown"] {
+                        ; So we have a Countdown and a file that matches the Target configs, what happens to the timestamp?
+                        if !has_timestamp {
+                            this.StoredTimestamp.Create(A_loopFile.fullPath, A_Now)
+                            continue ; Fresh Timestamp has been set, so we skip
+                        }
+                        else ; Because by this step we already know that timestamp is over its limit, we will delete the timestamp
+                            this.StoredTimestamp.Clear_file(A_LoopFile.fullPath)
+                    }
+
+                    mark_time := QPC()
+                    if target.has_unprocessed_keywords()
+                        target.ConvertKeyword(&new_path, this.get_contextKeywords(A_LoopFile), Array())
+                    time_to_convert := QPC(mark_time)
+                    mark_time := QPC()
+                    new_path := Format("{}\", Trim(new_path, "\"))
+                    ; if this.Targets["Settings"][target_key]["Action"] = "Move"
+
+                    append_to_logger := () =>
+                        RegExReplace(Format("
+                    (join`r`n
+                        Moving Files
+                        `tFrom: {}
+                        `tto  : {}
+                    )", A_LoopFile.fullPath, SendFile(A_LoopFile.fullPath, Format("{}\{}.{}", new_path, A_LoopFile.name, A_LoopFile.ext)).MoveFile(SendFile.ENUMS_MOVE)),
+                            "\\+", "\")
+                    logger.append(append_to_logger())
+                    mark_time := A_TickCount
+
+
                 }
-                this.History := "`r`n" ; Logging Related - Adds a blank line to separate a Source Iteration
-                    , last_sourceIndex += 1
             }
-            ticks := this.QPC(this.ticks.Folder)
-                , totalTime += ticks
-                , watcherTicks .= A_Tab ticks "ms " Format("[p:{}]f:{} {}`r`n", last_sourceIndex, last_fileIndex, Watcher)
-                , last_fileIndex := 0, last_sourceIndex := 0
         }
-        SetListVars(this.History, 1)
-        msgbox Round(totalTime, 2) "ms `r`n" watcherTicks
+        this.StoredTimestamp.SyncFile()
+        static cycle_time_in_ms := 60 * 1000
+        re_doing := cycle_time_in_ms - Mod(A_TickCount - this_procedure_start_time, cycle_time_in_ms)
+        SetTimer(ObjBindMethod(this, "doProcedure"), -re_doing)
     }
-    do_fileMatch() { ; * Tells whether the file matches the predefined conditions
-        ; msgbox this._loop.source " `r`n" this.LF.fullName
-        msgbox DisplayMap(this._Watcher.Value, A_LineNumber)
-        If this._Watcher.Value["Age_asCountdown"]
-            If (this._loop.fileAge := this.get_StoredAge()) <= this._Watcher.Value["TimeUp"] ; * Returns Age in seconds.
-                return 0
-        ;* Because we're evaluating if it should have a cooldown, if
-        msgbox UDF.getPropsList(this._Watcher)
-        msgbox UDF.getPropsList(this.LF)
-        DisplayMap(this._Watcher.Value, A_LineNumber)
-        this._loop.conflicts := [] ;* This will keep tracks cases when there're more than a single target match
-        for TargetKey in this._Watcher.Value["TargetKeys"]
+
+    /**
+     * 
+     * @param target_config {`TargetFile()`}
+     * @returns {false, String of source_file's new_path}
+     */
+    file_matches_target_config(target_instance_config, A_LoopFile) { ; * Tells whether the file matches the predefined conditions
+        ; msgbox this.loop.source " `r`n" this.LF.fullName
+
+
+        switch target_instance_config["Type"] {
+            default:
+                matching_name := A_LoopFile.fullName
+            case "Filetype":
+                matching_name := A_LoopFile.ext
+            case "Keyword":
+                matching_name := A_LoopFile.name
+        }
+        match := []
+        For search_key in target_instance_config["SearchKeys"] {
+            regKey := this.generate_regkey(search_key)
+            If RegExMatch(matching_name, regKey is string ? regKey : regKey[1])
+                match.Push(regKey)  ; * To know how many regex keys matches the filename
+        }
+        ; If we have a matching "regKey", it will then store the match into
+        if match.Length
         {
-            switch this.Targets[TargetKey].type, 0 {
-                case "mixed":
-                    fileName := this.LF.fullName
-                case "Filetype":
-                    fileName := this.LF.ext
-                case "Keyword":
-                    fileName := this.LF.name
-            }
-            match := 0
-            For regKey in this.Targets[TargetKey].Targets
-                match += !!RegExMatch(fileName, regKey)  ; * To know how many regex keys matches the filename
-            if match
-            {
-                this._loop.conflicts.Push(TargetKey)
-                if (this._loop.conflicts.Length = 1)
-                    this._loop.matchedFiles_First := this.Targets[TargetKey]["Target"]
-                If !this._loop.matchedFiles ; * This is to discriminate between the first match and subsequent ones.
-                    ; * It's purpose is to add a header to the list that will identify the logging info
-                    this.History["", "INFO", 0] := Format("{1}`r`n{4}{2}→RegExs:{3}",
-                        this._loop.source, this.Targets[TargetKey].type, JXON.Dump(this.Targets[TargetKey].Targets), A_Tab
-                    )
-                if this._loop.conflicts.Length = 1 {
-                    this.History := Format("[{1}]{2}({3})`r`n", this._loop.fileIndex, this.LF.fullName, match) ;A_Tab this.Targets[TargetKey].type  A_Tab JXON.Dump(this.Targets[TargetKey].Targets, 1) "`r`n"
-                    ; msgbox UDF.getPropsList(this._loop, A_LineNumber) ; * This has the purpose of letting me know which properties are already occupied
-                }
-            }
+            this.loop.regex_matches := match.Length,
+                this.loop.regEx := match[1]
+            return target_instance_config["Target"]
         }
-        if !!this._loop.conflicts.Length
-            this._loop.matchedFiles += 1
-        return !!this._loop.conflicts.Length
+        return ""
     }
-    get_StoredAge() {
+    /**
+     * 
+     * @param path {key string of `sources_of_stored_timestamp`}
+     * @param file_name {key string of `sources_of_stored_timestamp`}
+     * @param sources_of_stored_timestamp {`StoredTimestamp()`}
+     * @returns {bool} 
+     */
+    hasTimestamp(path, file_name, sources_of_stored_timestamp := this.StoredTimestamp) => sources_of_stored_timestamp.HasKeys(path, file_name)
+    get_timestamp_from(stored_timestamp, full_path) => stored_timestamp.Get(full_path)
+    ; hasTimestamp() => this.storedTimestamp.HasKeys(this.loop.LF.path, this.loop.LF.fullName)
 
-        return
+    ; get_timestamp() => this.storedTimestamp.Get(this.loop.LF.fullPath)
+
+    generate_regkey(search_key) {
+        if RegExMatch(search_key, "r\/(?<regex_literal>.*)\/", &patt) {
+            regkey := patt["regex_literal"]
+            if !RegExMatch(regkey, "^([imsxADJUXSC]|``a|``r|``n|)+\)")
+                regkey := "i)" regkey ; Defaults RegEx flag to insensitive
+        }
+        else
+            regkey := "i)" search_key ; Defaults RegEx flag to insensitive
+        return regkey
     }
-    proceed_Send() {
-
+    get_contextKeywords(A_LoopFile) {
+        ; Registered ~06.65E-3ms per call using Arrow Function 2023/04/23
+        ; Registered ~13.65E-3ms per call using strings 2023/04/23
+        temp := A_LoopFile.timeModified,
+            myMap := Map(),
+            myMap.CaseSense := "Off",
+            myMap.Set(
+                "M_YearMonth", FormatTime(temp, "YearMonth"),
+                "M_YDay", FormatTime(temp, "YDay"),
+                "M_YDay0", FormatTime(temp, "YDay0"),
+                "M_WDay", FormatTime(temp, "WDay"),
+                "M_YWeek", FormatTime(temp, "YWeek"),
+                "M_d", FormatTime(temp, "d"),
+                "M_dd", FormatTime(temp, "dd"),
+                "M_ddd", FormatTime(temp, "ddd"),
+                "M_dddd", FormatTime(temp, "dddd"),
+                "M_M", FormatTime(temp, "M"),
+                "M_MM", FormatTime(temp, "MM"),
+                "M_MMM", FormatTime(temp, "MMM"),
+                "M_MMMM", FormatTime(temp, "MMMM"),
+                "M_y", FormatTime(temp, "y"),
+                "M_yy", FormatTime(temp, "yy"),
+                "M_yyyy", FormatTime(temp, "yyyy"),
+            )
+            ; myMap.Set(
+            ;     "YearMonth", () => FormatTime(temp, "YearMonth"),
+            ;     "YDay", () => FormatTime(temp, "YDay"),
+            ;     "YDay0", () => FormatTime(temp, "YDay0"),
+            ;     "WDay", () => FormatTime(temp, "WDay"),
+            ;     "YWeek", () => FormatTime(temp, "YWeek"),
+            ;     "d", () => FormatTime(temp, "d"),
+            ;     "dd", () => FormatTime(temp, "dd"),
+            ;     "ddd", () => FormatTime(temp, "ddd"),
+            ;     "dddd", () => FormatTime(temp, "dddd"),
+            ;     "M", () => FormatTime(temp, "M"),
+            ;     "MM", () => FormatTime(temp, "MM"),
+            ;     "MMM", () => FormatTime(temp, "MMM"),
+            ;     "MMMM", () => FormatTime(temp, "MMMM"),
+            ;     "y", () => FormatTime(temp, "y"),
+            ;     "yy", () => FormatTime(temp, "yy"),
+            ;     "yyyy", () => FormatTime(temp, "yyyy"),
+            ; )
+            , myMap.Set("Year", myMap["M_yyyy"], "Month", myMap["M_MM"], "Mon", myMap["M_MM"], "Day", myMap["M_dd"])
+        return myMap
     }
 
-    store_FileInstance() {
-        fileObj := Object()
-            , fileObj.fullName := A_LoopFileName, fileObj.ext := A_LoopFileExt
-            , fileObj.name := RegExReplace(fileObj.fullName, "\..*$", "")
-            , fileObj.fullPath := A_LoopFileFullPath, fileObj.path := A_LoopFileDir
-            ; , fileObj.timeAccess := A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
+    /**
+     * 
+     * @returns {object} 
+     * fields defined:
+     * fileObj.fullName := FullName
+     * fileObj.ext := Ext
+     * fileObj.name := name
+     * fileObj.fullPath := A_LoopFileFullPath
+     * fileObj.path := Path
+     * fileObj.timeModified := A_LoopFileTimeModified
+     */
+    storeA_LoopFile() {
+        SplitPath(A_LoopFileFullPath, &FullName, &Path, &Ext, &name)
+            , fileObj := Object()
+            , fileObj.fullName := FullName
+            , fileObj.ext := Ext
+            , fileObj.name := name
+            , fileObj.fullPath := A_LoopFileFullPath
+            , fileObj.path := Path
             , fileObj.timeModified := A_LoopFileTimeModified
+        ; , fileObj.timeAccess := A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
         ; , fileObj.timeCreated:=A_LoopFileTimeAccessed ; * Commented out because I don't know if storing this equals to a read instance of the file
-        this.DefineProp("LF", { value: fileObj })
+        this.loop.DefineProp("A_LoopFiles", { value: fileObj })
+        return fileObj
     }
-    Dump(content, file := A_ScriptDir "\logs.txt", Encryption := "UTF-8") { ; Dumps history into the file
-
+    Dump(content, file := A_WorkingDir "\logs.txt", Encryption := this._encoding, overwrite := 0) { ; Dumps history into the file
+        ;* Unfinished
     }
     procedureIndex {
         set {
@@ -514,14 +333,13 @@ Class Strega_Watcher {
     }
     History[Detail := "", InfoType := "LOG", CountStep := 1, Dump := 0] {
         set {
-            if Value = "`r`n"
+            if (InfoType = "")
             {
-                this._History := this.History "`r`n"
+                this._History := this.History (Detail = "" ? "" : Detail "→") Value
                 return
             }
             this.Count.History += CountStep
                 , this._History := this.History this.LogFormat(Detail, Value, InfoType, !!CountStep ? this.Count.History : 0)
-
             if (!Dump and (Mod(this.Count.History, this.History_CountThreshold) and this.Count.History >= 0)) or this.Count.History = 0
                 return
             msgbox "dumping " . Format(this.Count.History "){1}={2}`r`n{3}", Mod(this.Count.History, this.History_CountThreshold), this.Count.History >= 0, !Dump and (Mod(this.Count.History, 50) and this.Count.History >= 0))
@@ -535,370 +353,6 @@ Class Strega_Watcher {
                 return this._History := Format("[{}]`r`n",
                     FormatTime(A_Now, "yyyy/MM/dd HH:mm:ss")
                 )
-
         }
     }
-
-}
-
-Class StoredTimestamp extends Watchdog_Base {
-    __New(Path, type := "Text", encoding := this._encoding) {
-        this.DefineProp("__path", { Value: StrLen(path) })
-            , this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
-            , JsonMap := this.transformString(Path, Type, encoding)
-            , this.mergeMap(this, JsonMap)
-        ; , this.Targets := TargetFile.Configs(this["Targets"], this) ; This will leave an un-edited version of this["Targets"]
-    }
-    __Item[keyName] {
-        get {
-            if this.Has(keyName)
-                return super[keyName]
-            else
-                this[KeyName] := StoredTimestamp.Path()
-        }
-        set {
-            super[keyName] := Value
-        }
-    }
-    Class Path extends Map{
-        
-    }
-}
-
-WatchPaths := ""
-PathTargets := ""
-Watchdog(InputTime := "") {
-
-    Global PathTargets, WatchPaths, _rn
-    Static Index := 0, watchDog_Data := UDF.Map("StartTime", InputTime)
-    Start_Tick := A_TickCount
-    ;tooltip, % Format("StartTime:{}, Index:{}",Watchdog_Data.StartTime.tick , Index), 0, 0, 1
-    Index += 1
-        , WP_Index := 0, Warnings := "", DebugText := ""
-
-    For Key, Paths in WatchPaths["Paths"] {
-
-        WP_Index += 1
-        If Paths["Skip"]
-        {
-            Continue
-        }
-        Text .= Format("PathName:[{}]`r`n", Key)
-        Paths := S_RefineWatchPaths(Key, Paths)
-
-        For WatchSource_Index, Name in Paths["Source[asArray]"]
-        {
-            WarningText := UDF.Map()
-            Text .= "[" Name "]`r`n"
-            If !FileExist(Name)
-            { Warnings .= LogFormat(Format("Unknown Source Path! [{1}]", Name), "WARNING", Format("{1}:`"{}`".{}", A_LineNumber, Key, A_Index))
-                Format(".{}", _rn)
-                Continue
-            }
-            Loop Files Name, "F"
-            {
-                FileData := S_LoopFileData(Paths)
-                WarningText := S_ProcessFile_to_Target(Paths, FileData, Key)
-                DebugText .= WarningText["Text"]
-            }
-            Warnings .= WarningText["Warning"]
-            DebugText := Paths["SourceName"] "[" Name "]`r`n" DebugText
-        }
-        Text .= _rn _rn
-    }
-    DebugText := "", Text := ""
-    If DebugText
-        SetListVars("Debugs Text`r`n" DebugText, 1)
-    If (Warnings and A_Index < 2)
-        SetListVars(Format("{1}{3}`r`n`tThis Run Summary:`r`n{2}{4}ms to Process a first iteration", FormatTime(A_Now, "[yyyy/MM/dd HH:mm:ss.ms]"), Warnings, "", A_TickCount - Start_Tick), 1)
-    If Text
-        SetlistVars(Text, 1)
-    SetlistVars(MyText _rn A_LineNumber, 1)
-    pause
-    SetTimer Watchdog, -1000
-}
-
-ListParse(InputObject := "") { ; Parse a list of Strings in the next format "String1|String2|String3|....|StringN"
-    For Key, Val in InputObject
-    { if (Key = 1)
-        Delimiter := ""
-        else
-            Delimiter := "|"
-        Output .= Delimiter Val
-    }
-    return Output
-}
-S_getFileAge(I_Object, FilePattern) {
-    ;define Section, and Keys.
-
-    ; I_Object["File_Age"]:=I_Object["isAgeCountdown"]?S_getOrCreate_TimeMark(FileData,Format("{}\Files Data.ini",A_ScriptDir))
-    ;DisplayMap(I_Object,A_LineNumber)
-    If !I_Object["isAgeCountdown"]
-        Age := I_Object["Time"]["LastModified"]
-    else
-    {
-        /*
-        	Age:=UDF.IniRead(FilePattern, I_Object["SourceName"]
-        	, RegExReplace(I_Object["FullPath"],"=","``|") ; KeyName
-        	, "N/A", A_Now)
-        */
-        ; I noticed that this Method of reading and defining file age is possibly terrible. I'll try to remember finish this some other day
-        ; Some Source to consider: https://gist.github.com/anonymous1184/737749e83ade98c84cf619aabf66b063
-        ; https://www.reddit.com/r/AutoHotkey/comments/s1it4j/automagically_readwrite_configuration_files/
-        ;Age:=UDF.IniRead(FilePattern, I_Object["SourceName"],I_Object["FullPath"] "=ASAS", "N/A")
-        Age := 0
-    }
-
-    ;	Msgbox !I_Object["isAgeCountdown"] _rn Age _rn A_LineNumber _rn "Finished ?"
-    ;DisplayMap(I_Object,A_LineNumber)
-
-
-    I_Object["Age"] := DateDiff(A_Now, Age, "s")
-        , I_Object["DetailedAge"] := FormatSeconds(I_Object["Age"])
-    ;UDF.IniRead(Filename, Section :="" ,Key :="" , Default:="" , Auto:="")
-    ;Time:=UDF.IniRead(FilePattern, )
-    return I_Object
-}
-S_LoopFileData(I_Object) {
-    RegExMatch(A_LoopFileName, "(?P<Name>.*)\." A_LoopFileExt "?", &SubPat)
-    Local Map
-    Map := UDF.Map()
-    Map["Extension"] := A_LoopFileExt
-        , Map["SourceName"] := I_Object["SourceName"]
-        , Map["isAgeCountdown"] := I_Object["Age_asCountdown"]
-        , Map["Name"] := SubPat[1]
-        , Map["FullName"] := A_LoopFileName
-        , Map["FullPath"] := A_LoopFileFullPath
-        , Map["Path"] := A_LoopFileDir "\"
-        , Map["Time"] := UDF.Map()
-        , Map["Time"]["LastModified"] := A_LoopFileTimeModified
-        , Map["Time"]["LastModified_Month"] := FormatTime(A_LoopFileTimeModified, "MM")
-        , Map["Time"]["LastModified_Year"] := FormatTime(A_LoopFileTimeModified, "yyyy")
-        , Map["Time"]["LastModified_Day"] := FormatTime(A_LoopFileTimeModified, "dd")
-        , Map["Time"]["TimeCreated"] := A_LoopFileTimeCreated
-        , Map["Time"]["TimeCreated_Month"] := FormatTime(A_LoopFileTimeCreated, "MM")
-        , Map["Time"]["TimeCreated_Year"] := FormatTime(A_LoopFileTimeCreated, "yyyy")
-        , Map["Time"]["TimeCreated_Day"] := FormatTime(A_LoopFileTimeCreated, "dd")
-    return Map
-}
-S_RefineWatchPaths(Key, Paths) {
-    ;Key is the WatchPaths[NKey] Pointer, whereas
-    Global WatchPaths
-
-    if (!Paths["processedTimeUp"]) {
-        For ArrIndex, Value in Paths["Source[asArray]"]
-        { 	;If !RegExMatch(Value, "(<|>)")
-            ;	Continue
-            ;; Just in case so I know to try this IF Condition to improve performance, even if minimally
-            if !(Value ~= "\\\*?$")
-                Value := Value "\"
-            if (Value ~= "\\$")
-                Value := Value "*"
-
-            Paths["Source[asArray]"][ArrIndex] := S_ProcessPathKeywords(Value)
-
-        }
-
-        SubMap := S_TimeTextFormat_to_Seconds(Paths["TimeUp"])
-        Paths["TimeUp"] := SubMap["TimeUp"]
-            , Paths["TimeInfo"] := SubMap["TimeInfo"]
-            , Paths["processedTimeUp"] := 1
-            , WatchPaths["Paths"][Key] := Paths
-    }
-    Paths["SourceName"] := Key
-
-    Return Paths
-}
-
-S_RefineTargetPath(InputString, I_Object, TargetObject := "") {
-    Global PathTargets
-    Target_DateKeys := ListParse(PathTargets["DateKeys"])
-    Target_DateKeys := RegExReplace(Target_DateKeys, "<|>", "") ; Target_DateKeys := "<Year>|<Month>|<Day>"
-    DateType := PathTargets["FileDateType"]
-    OdInput := InputString
-    While (InputString ~= "i)<(" Target_DateKeys ")>")
-    { RegExMatch(InputString, "i)(" Target_DateKeys ")", &SubPat)
-        InputString := RegExReplace(InputString, "<" SubPat[1] ">", I_Object["Time"][Format("{}_{}", DateType, SubPat[1])])
-
-    }
-    InputString := S_ProcessPathKeywords(InputString)
-
-    If !RegExMatch(InputString, "\\$")
-        InputString .= "\"
-
-    Return InputString
-}
-
-
-/*
-
-
-
-*/
-S_ProcessFile_to_Target(Paths, FileData, Name := "") {
-    Global PathTargets
-    Local Text := ""
-    For Index, TargetKey in Paths["TargetKeys"] {
-        Target := PathTargets[TargetKey]
-        If !Target
-        { Warning .= LogFormat(Format("There's no such Key: `"{1}`"", TargetKey), "WARNING", Format("{1}:`"{}`" {}", A_LineNumber, Name, A_Index))
-            Continue
-        }
-        If ((FileExist(DestPattern := S_RefineTargetPath(Target["Target"], FileData, Target)) != "D")
-            and !(Target["Target"] ~= ("i)" ListParse(PathTargets["DateKeys"])))) ; It skips current iteration if the TargetPath either doesn't exists, or isn't a Variadic Target
-        {
-            Warning .= LogFormat(Format("Unknown Target Path! [{}]", DestPattern), "WARNING", Format("{1}:{}[`"{}`"]", A_LineNumber, Name, TargetKey))
-            Continue
-        }
-
-        If Target
-            Switch Target["Type"], 0
-            {
-                case "Keyword":
-                    ;RegExList:= "i)(" ListParse(Target["Key"]) ")"
-                    ;If !( FileData["Name"] ~=  RegExList )
-                    ;	Continue
-                    MatchObject := FileData["Name"]
-                case "FileType":
-                    ;RegExList:= "i)(" ListParse(Target["Key"]) ")"
-                    ;If !( FileData["Extension"] ~= RegExList )
-                    ;	Continue
-                    MatchObject := FileData["Extension"]
-                Default:
-                    Warning .= LogFormat("UNKNOWN KEY!: `"" Target["Type"] "`" from " Paths["SourceName"] " in `"" TargetKey "`"", "WARNING", Format("{1}:`"{}`" {}", A_LineNumber, Name, A_Index))
-                    Continue
-            }
-
-        ParsingResult := 0
-        For Index, Value in Target["Key"]
-        { If (RegExMatch(Value, "i)R/(.*)/", &SubPat))
-            { ParsingResult += RegExMatch(FileData["FullName"], SubPat[1]) ? 1 : 0
-                Continue
-            }
-            ParsingResult += (MatchObject ~= "i)" Value) ? 1 : 0 ; Hopefully this method is faster compared to using If Condition
-        }
-        If !(ParsingResult)
-            continue
-        ;DestPattern:= "C:\Temp - AHK\Test\Targets\"
-
-        If !FileExist(DestPattern)
-            DirCreate(RegExReplace(DestPattern, "\*$", ""))
-        FileSource := FileData["FullPath"]
-        ;FileSource:="C:\Temp - AHK\Test\New Microsoft Word Document.docx"
-
-        ;DestPattern:= DestPattern
-        ;SetlistVars(FileSource "`r`n" DestPattern)
-
-        FileData := S_getFileAge(FileData, Format("{}\logs\Files Data.ini", A_ScriptDir))
-        ;ToDelete: FileData["File_Age"]:=FileData["isAgeCountdown"]?S_getOrCreate_TimeMark(FileData,Format("{}\Files Data.ini",A_ScriptDir)):FileData["Time"]["LastModified"]
-        ; Defines the Age(in seconds) of the file. In these 2 cases, we will either
-        ; obtain the age in terms of since the file was modified, vs the age in terms of
-        ; when it was first "found" by the script
-        DisplayMap(FileData, A_LineNumber)
-
-        WhileIndex := 0, ErrorCount := 0, Subfix := ""
-        While WhileIndex <= 256
-        {
-            WhileIndex := A_Index
-            If ErrorCount > 1
-                Subfix := Format("* {1} ({2}).*", FormatTime("[yyyy.MM.dd HH.mm.ss]", FileData["Time"][PathTargets["FileDateType"]]), ErrorCount - 1)
-            else if ErrorCount
-                Subfix := Format("* {1}.*", FormatTime("[yyyy.MM.dd HH.mm.ss]", FileData["Time"][PathTargets["FileDateType"]]))
-            try
-            {
-                ;FileMove(FileSource,DestPattern Subfix)
-                ;Global myText.=(
-                ;	A_LineNumber ")`r`nAttempts:" ErrorCount _rn FileSource _rn DestPattern Subfix _rn _rn )
-                Global myText .= Format("
-								( LTrim Join
-								{1} ") `r`n
-								{5} Attempts:" {2}`r`n 
-								{5} {3} ->`r`n
-								{5} {4}
-
-							)", A_LineNumber, ErrorCount, FileSource, DestPattern Subfix, A_Tab) _rn
-    Break
-        }
-            catch as E
-                ErrorCount += 1
-
-        }
-
-        ;					msgbox "Continue? " _rn A_LineNumber
-    }
-
-    OutputText := UDF.Map()
-    OutputText["Warning"] := Warning
-    OutputText["Text"] := Text
-    Return OutputText
-}
-; Value is Path as String
-S_ProcessPathKeywords(Value, SupportedKeyWords := "A_(Username|Y(YYY|Day|Week)|M{2,4}|D{2,4}|WDay|Desktop|ComputerName|AppData|MyDocuments|Mon)")
-{
-    While (Value ~= "i)<.*>")
-    {
-        Try
-        { RegExMatch(Value, "i)<(" SupportedKeyWords ")>", &SubPat)
-            Value := RegExReplace(Value, "i)<(" SubPat[1] ")>", %SubPat[1]%)
-        }
-        catch ; Once there's no more matches, the Try Block seems to Spook out and I can simply just remove the invalids "<Keyplace>" from the Source Paths
-        { Value := RegExReplace(Value, "i)(<|>)", "")
-            Break
-        }
-    }
-    Return Value
-}
-
-S_TimeTextFormat_to_Seconds(Time_asString) {
-    vMap := UDF.Map("TimeInfo", Map())
-
-    vMap["TimeInfo"]["Months"] := RegExMatch(Time_asString, "((?<Months>\d+)[M])", &Months) ? Months[2] : 0
-        , vMap["TimeInfo"]["Days"] := RegExMatch(Time_asString, "((?<Months>\d+)[Dd])", &Days) ? Days[2] : 0
-            , vMap["TimeInfo"]["Hours"] := RegExMatch(Time_asString, "((?<Months>\d+)[Hh])", &Hours) ? Hours[2] : 0
-                , vMap["TimeInfo"]["Minutes"] := RegExMatch(Time_asString, "((?<Months>\d+)[m])", &Minutes) ? Minutes[2] : 0
-                    , vMap["TimeInfo"]["Seconds"] := RegExMatch(Time_asString, "((?<Months>\d+)[sS])", &Seconds) ? Seconds[2] : 0
-                        , vMap["TimeUp"] := vMap["TimeInfo"]["Months"] * 86400 * 30 + vMap["TimeInfo"]["Days"] * 86400 + vMap["TimeInfo"]["Hours"] * 3600 + vMap["TimeInfo"]["Minutes"] * 60 + vMap["TimeInfo"]["Seconds"]
-    ;SetlistVars(Time_asString "`r`n" StrReplace(JSON.Dump(Map,,4), "`n", "`r`n"))
-    ;msgbox % Time_asString "-" Map.Months
-    return vMap
-}
-
-; DisplayMap(InputObject, LineNumber := "", Padding := 4) {
-; 	Static Iteration := 0
-; 	SetlistVars(StrReplace(JXON.Dump(InputObject, Padding), "`n", "`r`n"))
-; 	msgbox "Displaying Map :" (Iteration += 1) " `r`n" LineNumber
-; }
-
-Log(String, Action := "", SourceLine := "", FilePath := "") {
-    If (FilePath = "")
-        FilePath := A_ScriptDir "\log.log"
-    If !(SourceLine = "")
-        SourceLine := Format("({})", SourceLine)
-    String := LogFormat(String, Action, SourceLine)
-    FileAppend(String, FilePath)
-}
-
-LogFormat(String := "", Level := "LOG", SourceLine := "") {
-    If !(SourceLine = "")
-        SourceLine := Format("({})", SourceLine)
-    Type := Level SourceLine
-    Return Format("{1}{2}:{4}{3}`r`n"
-        , FormatTime(A_Now
-            , "[hh:mm:ss.ms]")
-        , Type
-        , String, "")
-}
-
-FormatSeconds(NumberOfSeconds)  ; Convert the specified number of seconds to hh:mm:ss format.
-{
-
-    time := 19990101  ; *Midnight* of an arbitrary date.
-    time := DateAdd(time, NumberOfSeconds, "Seconds")
-
-    HHmmss := FormatTime(time, "HH:mm:ss")
-    return NumberOfSeconds // 86400 " Days " HHmmss
-    /*
-    	Formats up to Days.
-    https://www.autohotkey.com/docs/v1/lib/FormatTime.htm
-    */
 }

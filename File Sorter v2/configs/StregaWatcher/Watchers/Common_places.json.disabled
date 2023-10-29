@@ -1,0 +1,12 @@
+{
+    "Skip" : 0,
+    "Source" : ["C:\\Users\\<A_UserName>\\Desktop", 
+        "C:\\Users\\<A_UserName>\\Downloads"
+        
+    ],
+    "isPath" : true,
+    "TargetKeys" : ["vectors", "images"],
+    "Description" : "Path to Watch over",
+    "TimeUp": "8d18h",
+    "Age_asCountdown": 1
+    }

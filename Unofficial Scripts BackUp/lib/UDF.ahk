@@ -99,17 +99,6 @@ getPropMap(Input, validProps := ["Value"], level := 1, cap := 10) {
 	return tempMap
 }
 
-CastCloneMap(CastTarget, MapToCast, NestLevel := 1) {
-	static max_nesting := 10
-	For key, value in MapToCast.Clone() {
-		if (NestLevel > max_nesting) && (value is Object)
-			value := Format("{} [{}]", type(value), ObjPtr(Value))
-		else if value is Map
-			CastCloneMap(value, value, NestLevel + 1)
-		CastTarget[key] := value
-	}
-}
-
 Class UDF {
 	Static ErrorFormat(errObject) =>
 		Format("{1}: {2}.`n`nFile:`t{3}`nLine:`t{4}`nWhat:`t{5}`nStack:`n{6}"

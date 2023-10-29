@@ -170,7 +170,7 @@
 
 	Static Dump(obj, indent:="", lvl:=1) {
 		if IsObject(obj) {
-			If !(obj is Array || obj is Map || obj is String || obj is Number )
+			If !(obj is Array || obj is Map || obj is String || obj is Number || obj is ArrayList )
 				throw Error("Object type not supported.", -1, Format("<Object at 0x{:p}>", ObjPtr(obj)))
 			
 			if IsInteger(indent)
@@ -187,7 +187,7 @@
 			Loop indent ? lvl : 0
 				indt .= indent
 			
-			is_array := (obj is Array )
+			is_array := (obj is Array || obj is ArrayList)
 			
 			lvl += 1, out := "" ; Make #Warn happy
 			for k, v in obj {
@@ -197,10 +197,10 @@
 				
 				if !is_array ;// key ; ObjGetCapacity([k], 1)
 					out .= (ObjGetCapacity([k]) ? This.Dump(k) : escape_str(k)) (indent ? ": " : ":") ; token + padding
-				; if (v is Boolean) ; this seems to fix the fact that they're values stored as a property
-				; 	v:=v.flag
-				; else if v is Date
-				; 	v:=v.Date
+				if (v is Boolean) ; this seems to fix the fact that they're values stored as a property
+					v:=v.flag
+				else if v is Date
+					v:=v.Date
 				
 				;msgbox Type(k) " " Type(v) (Type(k)?"`r`n" k : "") (v is Integer ||v is Float ||v is string ||v is Boolean?":=" v : "") 
 				out .= This.Dump(v, indent, lvl) ; value

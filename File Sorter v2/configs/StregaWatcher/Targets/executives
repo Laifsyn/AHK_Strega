@@ -1,0 +1,9 @@
+{
+    "SearchKeys": [
+        "exe"
+    ],
+    "Target": "",
+    "Type": "FileType",
+    "SortByDate": 1,
+    "CaseSensitive": false
+}

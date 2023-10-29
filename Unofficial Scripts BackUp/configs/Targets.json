@@ -33,7 +33,7 @@
 					
 			"SearchKeys" : ["Converted", "r/asdasda/", "karen"],
 			"Target" : "C:\\Macro\\Basic 1\\Test\\<A_Mon>\\<myName1>",
-			"Action" : "Move" , 
+			"Action" : "Move" ,
 			"Type" : "Keyword" ,
 			"SortByDate" : 1 ,
 			"CaseSensitive" : "false"
