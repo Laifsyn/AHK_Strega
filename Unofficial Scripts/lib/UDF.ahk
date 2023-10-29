@@ -2,6 +2,26 @@
 
 
 ; Functions
+/**
+ * Checks if the item exists in the list and returns the matching index
+ * 
+ * @param item item to look for in the list.
+ * @param list to search the item in.
+ * @param {boolean} caseSense 
+ * @returns {number} 
+ */
+IsInList(item, list, caseSense := false) {
+	if caseSense {
+		for index, v in list
+			if item == v
+				return index
+	} else {
+		for index, v in list
+			if item = v
+				return index
+	}
+	return 0
+}
 stringJoin(inputString, Amount) {
 	temp := ""
 	Loop Amount
@@ -30,8 +50,64 @@ SetListVars(Text, DoWaitMsg := 0, msgboxText := "Waiting.....") {
 
 DisplayMap(InputObject, LineNumber := "", Padding := 4) {
 	Static Iteration := 0
+	InputObject := getPropMap(InputObject)
 	SetlistVars(StrReplace(JXON.Dump(InputObject, Padding), "`n", "`r`n"))
 	msgbox "Displaying Map :" (Iteration += 1) " `r`n" LineNumber
+}
+
+getPropMap(Input, validProps := ["Value"], level := 1, cap := 10) {
+	tempMap := Map()
+	if Input is Map {
+		For k, v in Input ; Gives priority to Map's data.
+		{
+			If (isObj := IsObject(v)) && (level < cap)
+				v := getPropMap(v, validProps, level + 1)
+			else if level >= cap && isObj
+				v := Type(v)
+			tempMap.Set(k, v)
+		}
+	} else if Input is Array {
+		tempMap := Array()
+		For i, v in Input
+		{
+			If (isObj := IsObject(v)) && (level < cap)
+				v := getPropMap(v, validProps, level + 1)
+			else if level >= cap && isObj
+				v := Type(v)
+			tempMap.push(v)
+		}
+	}
+	else
+		for prop, v in Input.OwnProps()
+		{
+			If (isObj := IsObject(v)) && (level < cap)
+				v := getPropMap(v, validProps, level + 1)
+			else if (level >= cap && isObj)
+				v := Type(v)
+			if (validProps = "All")
+				tempMap.Set(prop, v)
+			Else
+				for validName in validProps
+					if (prop = validName)
+					{
+						if validProps.Length = 1
+							tempMap := v
+						else
+							tempMap.Set(prop, v)
+					}
+		}
+	return tempMap
+}
+
+CastCloneMap(CastTarget, MapToCast, NestLevel := 1) {
+	static max_nesting := 10
+	For key, value in MapToCast.Clone() {
+		if (NestLevel > max_nesting) && (value is Object)
+			value := Format("{} [{}]", type(value), ObjPtr(Value))
+		else if value is Map
+			CastCloneMap(value, value, NestLevel + 1)
+		CastTarget[key] := value
+	}
 }
 
 Class UDF {

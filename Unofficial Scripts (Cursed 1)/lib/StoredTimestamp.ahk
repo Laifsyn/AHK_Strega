@@ -6,15 +6,12 @@ Class StoredTimestamp extends StoredTimestamp_Internals {
             , this.path := path
             , this.filename := filename
             , this.LoadMap()
-        this.off_sync := false
         return this
     }
     /**
      * Dumps the data
      */
     SyncFile() {
-        if !this.off_sync
-            return ;MsgBox("Nothing to sync")
         base_map := Map()
         for path, files in this {
             if !base_map.Has(path)
@@ -22,12 +19,12 @@ Class StoredTimestamp extends StoredTimestamp_Internals {
             for file, obj in files
                 base_map[path][file] := obj.Value
         }
-        serialized_str := JXON.Dump(base_map, 2)
-        timestamp_file := FileOpen(this.search_path, 0x3, this.Encoding)
+
+        serialized_str := JXON.Dump(this, 1)
+            , timestamp_file := FileOpen(this.path, 0x3, this.Encoding)
             , timestamp_file.Write(serialized_str)
             , timestamp_file.Length := timestamp_file.pos
             , timestamp_file.Close()
-            , this.off_sync := false
     }
 
     HasKeys(path, filename) => this.Has(path) && this[path].has(filename)
@@ -37,8 +34,7 @@ Class StoredTimestamp extends StoredTimestamp_Internals {
 
 Class StoredTimestamp_Internals extends Map {
     CaseSense := "Off"
-    off_sync := true
-    Synced := false
+    Sync := true
     isValid := true
     Encoding := A_FileEncoding
     __Delete() {
@@ -63,24 +59,21 @@ Class StoredTimestamp_Internals extends Map {
      * updates the map's content
      */
     Update(absolute_path, value) {
-        if (FileExist(absolute_path) != "A")
+        if !(FileExist(absolute_path) != "A")
             throw ValueError("Path doesn't point to a file!", , absolute_path)
         SplitPath(absolute_path, &filename, &dir)
             , super[dir][filename].Value := value
             , super[dir][filename].lastModified := A_Now
-            , this.off_sync := true
     }
     /**
+     * Create a space in memory for the address
      * 
-     * @param absolute_path 
-     * @param value 
-     * @returns {void} 
+     * @return void
      */
     Create(absolute_path, value) {
         if (FileExist(absolute_path) != "A")
             throw ValueError("Path doesn't point to a file!", , absolute_path)
         SplitPath(absolute_path, &filename, &dir)
-        ; Populates unexistent nodes
         if !super.Has(dir)
             super[dir] := Map(), super[dir].CaseSense := "Off"
         if !super[dir].has(filename)
@@ -92,23 +85,7 @@ Class StoredTimestamp_Internals extends Map {
         super[dir][filename].Value := value
             , super[dir][filename].created_timestamp := A_Now
             , super[dir][filename].last_modified := super[dir][filename].created_timestamp
-            , this.off_sync := true
     }
-
-    Clear_file(absolute_path) {
-        if (FileExist(absolute_path) != "A")
-            throw ValueError("Path doesn't point to a file!", , absolute_path)
-        SplitPath(absolute_path, &filename, &dir)
-        if !super.Has(dir)
-            return
-        if !super[dir].Has(filename)
-            return
-        super[dir].Delete(filename)
-            , this.off_sync := true
-        if super[dir].Count == 0
-            super.Delete(dir)
-    }
-
     /**
      * Get timestamp stored from an absolute_path
      */
@@ -121,7 +98,7 @@ Class StoredTimestamp_Internals extends Map {
     }
 
     FileRead() {
-        If !FileExist(this.search_path) {
+        If !FileExist(this.search_path){
             FileAppend("{}", this.search_path, this.Encoding)
             return "{}"
         }
@@ -139,10 +116,9 @@ Class StoredTimestamp_Internals extends Map {
         for key_path, filenames in file_map {
             if !super.Has(key_path)
                 super[key_path] := Map(),
-                    super[key_path].CaseSense := "Off"
+                super[key_path].CaseSense := "Off"
             for key_filename, timestamps in filenames {
-                if !FileExist(absolute_path := key_path "\" key_filename)
-                    continue
+                absolute_path := key_path "\" key_filename
                 if !super[key_path].Has(key_filename)
                     super[key_path][key_filename] := Object()
                 super[key_path][key_filename].created_timestamp := A_Now

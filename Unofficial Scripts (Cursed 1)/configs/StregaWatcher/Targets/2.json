@@ -1,0 +1,13 @@
+{
+    "SearchKeys": [
+        "jpg",
+        "png",
+        "lnk",
+        "ahk"
+    ],
+    "Target": "C:\\myTemp - AHK\\Test\\Target\\<Year>\\<Month>\\<Day>s",
+    "Action": "Move",
+    "Type": "Filetype",
+    "SortByDate": 0,
+    "CaseSensitive": "false"
+}
