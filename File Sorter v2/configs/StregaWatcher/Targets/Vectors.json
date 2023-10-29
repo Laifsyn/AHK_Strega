@@ -1,0 +1,12 @@
+{
+    "SearchKeys": [
+        "ai",
+        "eps",
+        "pdf",
+        "vDoc"
+    ],
+    "Target": "<Downloads>\\Target_path\\Vectors\\<*Year>\\<*Mon>",
+    "Type": "FileType",
+    "SortByDate": 1,
+    "CaseSensitive": "<default>"
+}

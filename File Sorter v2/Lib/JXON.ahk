@@ -37,7 +37,29 @@
 ; https://github.com/cocobelgica/AutoHotkey-JSON
 
 	Class JXON {
-	Static Load(&src, args*) {
+		
+	__New(Path, type := "Text", encoding := "UTF-8") {
+		this.DefineProp("__path", { Value: StrLen(path) })
+		, this.DefineProp("__fileLastModified", { Value: FileGetTime(Path, "M") })
+		if Path is file
+		{
+			JsonString := Path.read()
+			Try
+				Path.Close()
+			catch as E
+			{
+				msgbox(E.What)
+				return
+			}
+		}
+		else if Type is "File"
+			JsonString := fileread(Path, encoding)
+			, this.DefineProp("__path", { Value: Path })
+		this := JXON.Load(JsonString)
+		return	
+		
+	}
+	Static Load(src, args*) {
 		key := "", is_key := false
 		stack := [ tree := [] ]
 		next := '"{[01234567890-tfn'
@@ -148,7 +170,7 @@
 
 	Static Dump(obj, indent:="", lvl:=1) {
 		if IsObject(obj) {
-			If !(obj is Array || obj is Map || obj is String || obj is Number)
+			If !(obj is Array || obj is Map || obj is String || obj is Number )
 				throw Error("Object type not supported.", -1, Format("<Object at 0x{:p}>", ObjPtr(obj)))
 			
 			if IsInteger(indent)
@@ -165,16 +187,22 @@
 			Loop indent ? lvl : 0
 				indt .= indent
 			
-			is_array := (obj is Array)
+			is_array := (obj is Array )
 			
 			lvl += 1, out := "" ; Make #Warn happy
 			for k, v in obj {
+				
 				if IsObject(k) || (k == "")
 					throw Error("Invalid object key.", -1, k ? Format("<Object at 0x{:p}>", ObjPtr(obj)) : "<blank>")
 				
 				if !is_array ;// key ; ObjGetCapacity([k], 1)
 					out .= (ObjGetCapacity([k]) ? This.Dump(k) : escape_str(k)) (indent ? ": " : ":") ; token + padding
+				; if (v is Boolean) ; this seems to fix the fact that they're values stored as a property
+				; 	v:=v.flag
+				; else if v is Date
+				; 	v:=v.Date
 				
+				;msgbox Type(k) " " Type(v) (Type(k)?"`r`n" k : "") (v is Integer ||v is Float ||v is string ||v is Boolean?":=" v : "") 
 				out .= This.Dump(v, indent, lvl) ; value
 					.  ( indent ? ",`n" . indt : "," ) ; token + indent
 			}
@@ -189,7 +217,6 @@
 		
 		} Else If (obj is Number)
 			return obj
-		
 		Else ; String
 			return escape_str(obj)
 		

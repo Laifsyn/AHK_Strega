@@ -1,0 +1,14 @@
+{
+    "SearchKeys": [
+        "jpg",
+        "jpeg",
+        "png",
+        "tif",
+        "psd"
+    ],
+    "Target": "<Downloads>\\Target_path\\Imagenes\\<A_YYYY>\\<*M_MM>",
+    "Action": "Move",
+    "Type": "Filetype",
+    "SortByDate": 1,
+    "CaseSensitive": "false"
+}
