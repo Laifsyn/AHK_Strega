@@ -21,8 +21,15 @@ global_variables()
 
 path := A_Scriptdir "\configs\StregaWatcher"
 t := Strega_Watcher(path, path)
-Tooltip(Format("Finished initilizing in {} ms", QPC(start_up)))
-SetTimer(Tooltip.Bind(), -1000)
+
+e := FileGetTime(A_ScriptFullPath, "M")
+ToolTip(Format("Initializing.....{} - `r`n{}`r`n{} days ago({}/86400s)"
+    , A_ScriptName
+    , FormatTime(e, "yyyy-MM-dd(dddd) HH:mm:ss, ")
+    , DateDiff(A_Now, e, "Days")
+    , Mod(DateDiff(A_Now, e, "S"), 86400)))
+SetTimer(ToolTip.Bind(), -3500)
+Suspend
 t.doProcedure()
 if 1
     Exit

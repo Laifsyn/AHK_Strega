@@ -138,9 +138,17 @@ Class Strega_Watcher {
 
 
                     If this.watcher["Age_asCountdown"] &&
-                        has_timestamp := this.hasTimestamp(A_LoopFile.path, A_LoopFile.fullName, this.StoredTimestamp)
-                        If DateDiff(A_Now, this.get_timestamp_from(this.StoredTimestamp, A_LoopFile.fullPath), "s") <= this.watcher["TimeUp"]
-                            continue
+                        has_timestamp := this.hasTimestamp(A_LoopFile.path, A_LoopFile.fullName, this.StoredTimestamp) {
+                            file_path := A_LoopFile.fullPath
+                            timestamp_of_file := this.get_timestamp_from(this.StoredTimestamp, file_path)
+                            ; If the modified time is closest to A_Now than the one in StoredTimestamp, re-set the StoredTimestamp to now
+                            if DateDiff(timestamp_of_file, FileGetTime(file_path, "M"), "s") < 0 {
+                                this.StoredTimestamp.Create(file_path, A_Now)
+                                continue
+                            }
+                            If DateDiff(A_Now, timestamp_of_file, "s") <= this.watcher["TimeUp"]
+                                continue
+                    }
                     ; else
                     ;      MsgBox("hey, hey. You got something" Format("}{} <= {}", DateDiff(A_Now, this.get_timestamp_from(this.StoredTimestamp, A_LoopFile.fullPath), "s"), this.watcher["TimeUp"]))
 
@@ -249,7 +257,8 @@ Class Strega_Watcher {
     get_contextKeywords(A_LoopFile) {
         ; Registered ~06.65E-3ms per call using Arrow Function 2023/04/23
         ; Registered ~13.65E-3ms per call using strings 2023/04/23
-        temp := A_LoopFile.timeModified,
+        static new_locale := " L0009"
+        temp := A_LoopFile.timeModified new_locale,
             myMap := Map(),
             myMap.CaseSense := "Off",
             myMap.Set(
